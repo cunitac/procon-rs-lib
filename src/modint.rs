@@ -1,4 +1,4 @@
-//! 合同算術のための型
+//! 合同算術
 
 use num::{
     self,
@@ -31,7 +31,7 @@ impl<M: Modulus> ModInt<M> {
         self.0
     }
     /// # Safety
-    /// `val` が `modulus` 以上のとき，動作は未定義です．
+    /// `val` が `modulus` 以上のとき，動作は未定義．
     pub unsafe fn raw(val: u32) -> Self {
         Self(val, PhantomData)
     }
@@ -126,7 +126,7 @@ impl<M: Modulus> Div for ModInt<M> {
         self * rhs.inv()
     }
 }
-/// `rhs` が `0` に等しい場合を除き，常に `0` を返します．
+/// `rhs` が `0` に等しい場合を除き，常に `0` を返す．
 /// # Panics
 /// `rhs` が `0` に等しい場合
 impl<M: Modulus> Rem for ModInt<M> {
@@ -279,12 +279,13 @@ macro_rules! static_modint {
 static_modint!(type ModInt998244353 = ModInt<M998244353(998244353): u32>);
 static_modint!(type ModInt1000000007 = ModInt<M1000000007(1000000007): u32>);
 
-/// default modulus is `998_244_353`
+/// 既定の `modulus` は `998_244_353`
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug)]
 pub enum DynamicModulus {}
 impl DynamicModulus {
     pub fn set(modulus: u32) {
         assert_ne!(modulus, 0, "modulus must not be 0");
+        assert!(modulus <= (u32::max_value() + 1) / 2, "modulus is too big");
         Self::value_key().with(|val| *val.borrow_mut() = modulus)
     }
     fn value_key() -> &'static LocalKey<RefCell<u32>> {
