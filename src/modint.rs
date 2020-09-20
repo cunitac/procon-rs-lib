@@ -1,4 +1,4 @@
-//! For the modular arithmetic.
+//! 合同算術のための型
 
 use num::{
     self,
@@ -31,7 +31,7 @@ impl<M: Modulus> ModInt<M> {
         self.0
     }
     /// # Safety
-    /// `val` must be less than `modulus`
+    /// `val` が `modulus` 以上のとき，動作は未定義です．
     pub unsafe fn raw(val: u32) -> Self {
         Self(val, PhantomData)
     }
@@ -126,7 +126,9 @@ impl<M: Modulus> Div for ModInt<M> {
         self * rhs.inv()
     }
 }
-/// always return zero, unless `rhs == 0`.
+/// `rhs` が `0` に等しい場合を除き，常に `0` を返します．
+/// # Panics
+/// `rhs` が `0` に等しい場合
 impl<M: Modulus> Rem for ModInt<M> {
     type Output = Self;
     fn rem(self, rhs: Self) -> Self {
