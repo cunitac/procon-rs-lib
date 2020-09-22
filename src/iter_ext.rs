@@ -1,6 +1,9 @@
+//! Iterator の拡張
+
 impl<I> IterExt for I where I: Iterator {}
 
 pub trait IterExt: Iterator {
+    /// 累積和のようなもの
     fn accumulate<B, F>(self, init: B, f: F) -> Accumulate<Self, B, F>
     where
         F: FnMut(&B, Self::Item) -> B,
@@ -16,7 +19,9 @@ pub struct Accumulate<I, B, F> {
     f: F,
 }
 impl<I, B, F> Accumulate<I, B, F> {
-    fn new(iter: I, next: Option<B>, f: F) -> Self { Self { iter, next, f } }
+    fn new(iter: I, next: Option<B>, f: F) -> Self {
+        Self { iter, next, f }
+    }
 }
 impl<I, B, F> Iterator for Accumulate<I, B, F>
 where
@@ -33,9 +38,6 @@ where
 
 #[test]
 fn test_accumulate() {
-    use itertools::Itertools;
-
-    fn f(a: &i32, b: &i32) -> i32 { a + b }
-    let cum = [1, 2, 3].iter().accumulate(1, f).collect_vec();
+    let cum: Vec<_> = [1, 2, 3].iter().accumulate(1, |a, b| a * b).collect();
     assert_eq!(cum, vec![1, 1, 2, 6]);
 }

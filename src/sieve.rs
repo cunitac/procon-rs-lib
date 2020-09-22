@@ -1,7 +1,5 @@
 //! 素因数分解
 
-use std::iter;
-
 pub struct Sieve {
     min_factor: Vec<usize>,
 }
@@ -14,34 +12,53 @@ impl Sieve {
             if min_factor[i] != 0 {
                 continue;
             }
-            for j in 1..=max / i {
-                min_factor[i * j] = i;
+            let mut j = i;
+            while j <= max {
+                if min_factor[j] == 0 {
+                    min_factor[j] = i;
+                }
+                j += i;
             }
         }
         Self { min_factor }
     }
     /// 素因数分解できる最大の数
     pub fn upper_limit(&self) -> usize {
-        (self.min_factor.len() + 1).pow(2) - 1
-    }
-    /// 高速に素因数分解できる最大の数
-    pub fn fast_upper_limit(&self) -> usize {
-        self.min_factor.len()
+        self.min_factor.len() - 1
     }
     /// 素因数と指数の組を，素因数の昇順に見る
-    /// 最後まで見て O(lg n)
-    pub fn factor_pairs(&self, mut n: usize) -> impl Iterator<Item = (usize, usize)> + '_ {
-        iter::from_fn(move || {
-            if n == 1 {
-                return None;
-            }
-            let mut cnt = 0;
-            let mf = self.min_factor[n];
-            while self.min_factor[n] == mf {
-                n /= mf;
-                cnt += 1;
-            }
-            Some((mf, cnt))
-        })
+    pub fn factor_pairs(&self, val: usize) -> FactorPairs {
+        FactorPairs {
+            min_factor: &self.min_factor,
+            val,
+        }
     }
+}
+
+pub struct FactorPairs<'a> {
+    min_factor: &'a [usize],
+    val: usize,
+}
+
+impl Iterator for FactorPairs<'_> {
+    type Item = (usize, usize);
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.val == 1 {
+            return None;
+        }
+        let mut cnt = 0;
+        let mf = self.min_factor[self.val];
+        while self.min_factor[self.val] == mf {
+            self.val /= mf;
+            cnt += 1;
+        }
+        Some((mf, cnt))
+    }
+}
+
+#[test]
+fn test_factor_pairs() {
+    let sieve = Sieve::new(200);
+    let factor: Vec<_> = sieve.factor_pairs(200).collect();
+    assert_eq!(factor, vec![(2, 3), (5, 2)])
 }
