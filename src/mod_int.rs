@@ -1,10 +1,5 @@
 //! 合同算術
 
-use num::{
-    self,
-    integer::Integer,
-    traits::{Inv, Num, One, Pow, Zero},
-};
 use std::{
     cell::RefCell,
     convert::Infallible,
@@ -34,6 +29,58 @@ impl<M: Modulus> ModInt<M> {
     /// `val` が `modulus` 以上のとき，動作は未定義．
     pub unsafe fn raw(val: u32) -> Self {
         Self(val, PhantomData)
+    }
+    pub fn zero() -> Self {
+        unsafe { Self::raw(0) }
+    }
+    pub fn one() -> Self {
+        unsafe { Self::raw(1) }
+    }
+    pub fn inv(self) -> Self {
+        assert_ne!(self.0, 0, "attempt to get inverse of zero");
+        let mut r = (M::modulus() as i64, self.0 as i64);
+        let mut s = (0, 1);
+        while r.0 != 0 {
+            let q = r.1 / r.0;
+            let f = |r: &mut (i64, i64)| {
+                std::mem::swap(&mut r.0, &mut r.1);
+                r.0 -= q * r.1;
+            };
+            f(&mut r);
+            f(&mut s);
+        }
+        let (gcd, x) = if r.1 >= 0 { (r.1, s.1) } else { (-r.1, -s.1) };
+        assert_ne!(gcd, 1, "inverse does not exist");
+        Self::from(x)
+    }
+    pub fn from_str_radix(src: &str, radix: u32) -> Result<Self, Infallible> {
+        assert!(2 <= radix && radix <= 36, "radix must be in `[2, 36]`");
+        assert!(!src.is_empty(), "attempt to parse empty str");
+        let src = src.as_bytes();
+        let (positive, digits) = match src[0] {
+            b'+' => (true, &src[1..]),
+            b'-' => (false, &src[1..]),
+            _ => (true, src),
+        };
+        assert!(!digits.is_empty(), "attempt to parse sign");
+        let mut result = 0_u64;
+        for &c in digits {
+            let x = (c as char).to_digit(radix).expect("found invalid char") as u64;
+            result = (result * 10 + x) % M::modulus() as u64;
+        }
+        let ret = unsafe { Self::raw(result as u32) };
+        Ok(if positive { ret } else { -ret })
+    }
+    pub fn pow(mut self, mut exp: u64) -> Self {
+        let mut acc = Self::one();
+        while exp > 0 {
+            if exp & 1 == 1 {
+                acc *= self;
+            }
+            self *= self;
+            exp >>= 1;
+        }
+        acc
     }
 }
 
@@ -67,33 +114,10 @@ impl<M: Modulus> fmt::Debug for ModInt<M> {
     }
 }
 
-impl<M: Modulus> Zero for ModInt<M> {
-    fn zero() -> Self {
-        unsafe { Self::raw(0) }
-    }
-    fn is_zero(&self) -> bool {
-        self.0 == 0
-    }
-}
-impl<M: Modulus> One for ModInt<M> {
-    fn one() -> Self {
-        unsafe { Self::raw(1) }
-    }
-}
-
 impl<M: Modulus> Neg for ModInt<M> {
     type Output = Self;
     fn neg(self) -> Self {
         Self::zero() - self
-    }
-}
-impl<M: Modulus> Inv for ModInt<M> {
-    type Output = Self;
-    fn inv(self) -> Self {
-        assert_ne!(self.0, 0, "attempt to get inverse of zero");
-        let e = i64::extended_gcd(&self.0.into(), &M::modulus().into());
-        assert_ne!(e.gcd, 1, "multiplicative inverse does not exist");
-        Self::from(e.x)
     }
 }
 
@@ -195,43 +219,6 @@ forward_ref_op_assign!(MulAssign, mul_assign);
 forward_ref_op_assign!(DivAssign, div_assign);
 forward_ref_op_assign!(RemAssign, rem_assign);
 
-impl<M: Modulus> Num for ModInt<M> {
-    type FromStrRadixErr = Infallible;
-    fn from_str_radix(src: &str, radix: u32) -> Result<Self, Infallible> {
-        assert!(2 <= radix && radix <= 36, "radix must be in `[2, 36]`");
-        assert!(!src.is_empty(), "attempt to parse empty str");
-        let src = src.as_bytes();
-        let (positive, digits) = match src[0] {
-            b'+' => (true, &src[1..]),
-            b'-' => (false, &src[1..]),
-            _ => (true, src),
-        };
-        assert!(!digits.is_empty(), "attempt to parse sign");
-        let mut result = 0_u64;
-        for &c in digits {
-            let x = (c as char).to_digit(radix).expect("found invalid char") as u64;
-            result = (result * 10 + x) % M::modulus() as u64;
-        }
-        let ret = unsafe { Self::raw(result as u32) };
-        Ok(if positive { ret } else { -ret })
-    }
-}
-
-impl<M: Modulus> Pow<u64> for ModInt<M> {
-    type Output = Self;
-    fn pow(mut self, mut exp: u64) -> Self {
-        let mut acc = Self::one();
-        while exp > 0 {
-            if exp & 1 == 1 {
-                acc *= self;
-            }
-            self *= self;
-            exp >>= 1;
-        }
-        acc
-    }
-}
-
 impl<M: Modulus> Sum for ModInt<M> {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
         iter.fold(Self::zero(), |acc, x| acc + x)
@@ -269,15 +256,10 @@ macro_rules! static_modulus {
         }
     };
 }
-#[macro_export]
-macro_rules! static_modint {
-    (type $modint:ident = ModInt<$modulus:ident($val:expr): u32>) => {
-        static_modulus!(type $modulus: u32 = $val);
-        pub type $modint = ModInt<$modulus>;
-    };
-}
-static_modint!(type ModInt998244353 = ModInt<M998244353(998244353): u32>);
-static_modint!(type ModInt1000000007 = ModInt<M1000000007(1000000007): u32>);
+static_modulus!(type M998244353: u32 = 998244353);
+static_modulus!(type M1000000007: u32 = 1000000007);
+pub type ModInt998244353 = ModInt<M998244353>;
+pub type ModInt1000000007 = ModInt<M1000000007>;
 
 /// 既定の `modulus` は `998_244_353`
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug)]

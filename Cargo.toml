@@ -8,7 +8,7 @@ edition = "2018"
 
 [dependencies]
 # 数値型の抽象化、多倍長整数、複素数、分数、及び整数型の拡張
-num = "=0.2.1"
+#num = "=0.2.1"
 
 # `num-traits`の自動実装
 #num-derive = "=0.3.0"
@@ -99,4 +99,4 @@ proconio = { version = "=0.3.6", features = ["derive"] }
 # ---------------------------------------------------------------------
 
 [dev-dependencies]
-cli_test_dir = "0.1"
+#cli_test_dir = "0.1"
