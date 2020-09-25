@@ -195,7 +195,7 @@ pub trait Monoid {
 }
 
 #[macro_export]
-macro_rules! monoid {
+macro_rules! define_monoid {
     (type $t:ident = ($item:ty, $op:expr, $id:expr)) => {
         enum $t {}
         impl Monoid for $t {
@@ -212,7 +212,7 @@ macro_rules! monoid {
 
 #[test]
 fn test_seg_tree() {
-    monoid!(type M = (i32, |a, b| a + b, 0));
+    define_monoid!(type M = (i32, |a, b| a + b, 0));
     let sq = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
     let st = SegTree::<M>::from(&sq[..]);
     for i in 0..sq.len() {
