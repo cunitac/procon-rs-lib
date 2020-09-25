@@ -1,7 +1,6 @@
-use std::{
-    fmt::Debug,
-    ops::{Bound, Range, RangeBounds},
-};
+use super::algebra::Monoid;
+use super::util::range_from;
+use std::ops::{Range, RangeBounds};
 
 /// 便利な列 `st`
 pub struct SegTree<M: Monoid> {
@@ -16,7 +15,7 @@ impl<M: Monoid> SegTree<M> {
         Self::from(&vec![M::id(); n][..])
     }
     /// `st[i] = v`
-    pub fn update(&mut self, i: usize, v: M::Item) {
+    pub fn set(&mut self, i: usize, v: M::Item) {
         assert!(i < self.len, "index out: {}/{}", i, self.len);
         if self.len == 1 {
             return self.val = v;
@@ -24,11 +23,11 @@ impl<M: Monoid> SegTree<M> {
         let mid = self.len / 2;
         let (left, right) = self.child.as_mut().unwrap().as_mut();
         if i < mid {
-            left.update(i, v);
+            left.set(i, v);
         } else {
-            right.update(i - mid, v);
+            right.set(i - mid, v);
         }
-        self.val = M::op(&left.val, &right.val);
+        self.val = M::prod(&left.val, &right.val);
     }
     /// `st[i]`
     pub fn get(&self, i: usize) -> M::Item {
@@ -53,7 +52,7 @@ impl<M: Monoid> SegTree<M> {
         } else if mid <= start {
             right.fold_inner(start - mid, end - mid)
         } else {
-            M::op(
+            M::prod(
                 &left.fold_inner(start, mid),
                 &right.fold_inner(0, end - mid),
             )
@@ -74,7 +73,7 @@ impl<M: Monoid> SegTree<M> {
         P: FnMut(&M::Item) -> bool,
     {
         if start == 0 {
-            let merged = M::op(acc, &self.val);
+            let merged = M::prod(acc, &self.val);
             if pred(&merged) {
                 *acc = merged;
                 return self.len;
@@ -112,7 +111,7 @@ impl<M: Monoid> SegTree<M> {
         P: FnMut(&M::Item) -> bool,
     {
         if end == self.len {
-            let merged = M::op(acc, &self.val);
+            let merged = M::prod(acc, &self.val);
             if pred(&merged) {
                 *acc = merged;
                 return 0;
@@ -137,24 +136,6 @@ impl<M: Monoid> SegTree<M> {
     }
 }
 
-/// `[0, len)` 内の半開区間に変換
-fn range_from(range: impl RangeBounds<usize>, len: usize) -> Range<usize> {
-    use Bound::*;
-    let start = match range.start_bound() {
-        Included(&a) => a,
-        Excluded(&a) => a + 1,
-        Unbounded => 0,
-    };
-    let end = match range.end_bound() {
-        Excluded(&a) => a,
-        Included(&a) => a + 1,
-        Unbounded => len,
-    };
-    assert!(start <= end, "invalid range: {}..{}", start, end);
-    assert!(end <= len, "index out: {}/{}", end, len);
-    Range { start, end }
-}
-
 impl<M: Monoid> From<&[M::Item]> for SegTree<M> {
     fn from(slice: &[M::Item]) -> Self {
         if slice.len() == 1 {
@@ -169,49 +150,16 @@ impl<M: Monoid> From<&[M::Item]> for SegTree<M> {
             let right = Self::from(&slice[mid..]);
             Self {
                 len: slice.len(),
-                val: M::op(&left.val, &right.val),
+                val: M::prod(&left.val, &right.val),
                 child: Some(Box::new((left, right))),
             }
         }
     }
 }
 
-pub trait Element: Sized + Clone + Debug {}
-impl<T: Sized + Clone + Debug> Element for T {}
-
-pub trait Monoid {
-    type Item: Element;
-    fn id() -> Self::Item;
-    fn op(a: &Self::Item, b: &Self::Item) -> Self::Item;
-    fn fold<'a, I>(iterable: I) -> Self::Item
-    where
-        I: IntoIterator<Item = &'a Self::Item>,
-        Self::Item: 'a,
-    {
-        iterable
-            .into_iter()
-            .fold(Self::id(), |a, b| Self::op(&a, b))
-    }
-}
-
-#[macro_export]
-macro_rules! define_monoid {
-    (type $t:ident = ($item:ty, $op:expr, $id:expr)) => {
-        enum $t {}
-        impl Monoid for $t {
-            type Item = $item;
-            fn op(a: &$item, b: &$item) -> $item {
-                $op(a, b)
-            }
-            fn id() -> $item {
-                $id
-            }
-        }
-    };
-}
-
 #[test]
 fn test_seg_tree() {
+    use super::define_monoid;
     define_monoid!(type M = (i32, |a, b| a + b, 0));
     let sq = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
     let st = SegTree::<M>::from(&sq[..]);
