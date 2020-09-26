@@ -33,16 +33,16 @@ impl<M: Monoid> SegTree<M> {
     pub fn get(&self, i: usize) -> M::Item {
         self.fold(i..=i)
     }
-    /// `st[range].fold(M::id(), |a, b| M::op(&a, &b))`
+    /// `st[range].iter().fold(M::id(), |a, b| M::prod(&a, b))`
     pub fn fold(&self, range: impl RangeBounds<usize>) -> M::Item {
         let Range { start, end } = range_from(range, self.len);
+        if start == end {
+            return M::id();
+        }
         self.fold_inner(start, end)
     }
     fn fold_inner(&self, start: usize, end: usize) -> M::Item {
-        let len = end - start;
-        if len == 0 {
-            return M::id();
-        } else if len == self.len {
+        if end - start == self.len {
             return self.val.clone();
         }
         let mid = self.len / 2;
@@ -153,47 +153,6 @@ impl<M: Monoid> From<&[M::Item]> for SegTree<M> {
                 val: M::prod(&left.val, &right.val),
                 child: Some(Box::new((left, right))),
             }
-        }
-    }
-}
-
-#[test]
-fn test_seg_tree() {
-    use super::define_monoid;
-    define_monoid!(type M = (i32, |a, b| a + b, 0));
-    let sq = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-    let st = SegTree::<M>::from(&sq[..]);
-    for i in 0..sq.len() {
-        for j in i..sq.len() {
-            assert_eq!(sq[i..j].iter().sum::<i32>(), st.fold(i..j))
-        }
-    }
-    for start in 0..=sq.len() {
-        for max in 0..=55 {
-            let mut acc = 0;
-            let mut right = start;
-            while right < sq.len() && acc + sq[right] <= max {
-                acc += sq[right];
-                right += 1;
-            }
-            assert_eq!(st.max_end(start, |&sum| sum <= max), right);
-        }
-    }
-    for end in 0..=sq.len() {
-        for max in 0..=55 {
-            let mut acc = 0;
-            let mut left = end;
-            while left > 0 && acc + sq[left - 1] <= max {
-                left -= 1;
-                acc += sq[left];
-            }
-            assert_eq!(
-                st.min_start(end, |&sum| sum <= max),
-                left,
-                "{} {}",
-                end,
-                max
-            );
         }
     }
 }

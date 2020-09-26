@@ -1,5 +1,6 @@
 use super::algebra::{Action, Monoid};
 use super::util::range_from;
+use std::iter::FromIterator;
 use std::marker::PhantomData;
 use std::ops::{Range, RangeBounds};
 
@@ -26,10 +27,13 @@ where
         A::act(&mut self.val, &self.lazy);
         if let Some(child) = self.child.as_mut() {
             let (left, right) = child.as_mut();
-            O::op_from_left(&self.lazy, &mut left.lazy);
-            O::op_from_left(&self.lazy, &mut right.lazy);
+            O::op_from_right(&mut left.lazy, &self.lazy);
+            O::op_from_right(&mut right.lazy, &self.lazy);
         }
         self.lazy = O::id();
+    }
+    fn real_val(&self) -> M::Item {
+        A::image(&self.val, &self.lazy)
     }
     /// `lst[i]`
     pub fn get(&mut self, i: usize) -> &M::Item {
@@ -62,10 +66,56 @@ where
         }
         self.val = M::prod(&left.val, &right.val);
     }
-    /// `range.for_each(|i| A::act(&mut lst[i], op)`
-    pub fn act(&mut self, range: impl RangeBounds<usize>, op: O::Item) {
+    /// `lst[range].iter_mut().for_each(|x| A::act(x, op)`
+    pub fn act(&mut self, range: impl RangeBounds<usize>, op: &O::Item) {
         let Range { start, end } = range_from(range, self.len);
-        //self.act_inner(start, end, op);
+        if start == end {
+            return;
+        }
+        self.act_inner(start, end, op);
+    }
+    fn act_inner(&mut self, start: usize, end: usize, op: &O::Item) {
+        self.propagate();
+        if end - start == self.len {
+            return self.lazy = op.clone();
+        }
+        let mid = self.len / 2;
+        let (left, right) = self.child.as_mut().unwrap().as_mut();
+        if end <= mid {
+            left.act_inner(start, end, op);
+        } else if mid <= start {
+            right.act_inner(start - mid, end - mid, op);
+        } else {
+            left.act_inner(start, mid, op);
+            right.act_inner(0, end - mid, op);
+        }
+        self.val = M::prod(&left.real_val(), &right.real_val());
+    }
+    /// `lst[range].iter().fold(M::id(), |a, b| M::prod(&a, b))
+    pub fn fold(&mut self, range: impl RangeBounds<usize>) -> M::Item {
+        let Range { start, end } = range_from(range, self.len);
+        if start == end {
+            return M::id();
+        }
+        self.fold_inner(start, end)
+    }
+    fn fold_inner(&mut self, start: usize, end: usize) -> M::Item {
+        self.propagate();
+        if end - start == self.len {
+            return self.val.clone();
+        }
+        let mid = self.len / 2;
+        let (left, right) = self.child.as_mut().unwrap().as_mut();
+        if end <= mid {
+            left.fold_inner(start, end)
+        } else if mid <= start {
+            right.fold_inner(start - mid, end - mid)
+        } else {
+            M::prod(
+                &left.fold_inner(start, mid),
+                &right.fold_inner(0, end - mid),
+            )
+        }
     }
 }
 
@@ -95,3 +145,11 @@ where
         }
     }
 }
+
+impl<M: Monoid, O: Monoid, A> FromIterator<M::Item> for LazySegTree<M, O, A>
+where
+    A: Action<Item = M::Item, Operator = O::Item>,
+{
+    fn from_iter<I: IntoIterator<Item = M::Item>>(iter: I) -> Self {
+        Self::from(&Vec::from_iter(iter)[..])
+    }}

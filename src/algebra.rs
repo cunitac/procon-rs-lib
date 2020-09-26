@@ -24,6 +24,7 @@ pub trait Monoid {
     }
 }
 
+/// 右作用
 pub trait Action {
     type Item: Element;
     type Operator: Element;
@@ -44,6 +45,20 @@ macro_rules! define_monoid {
             }
             fn id() -> $item {
                 $id
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! define_action {
+    (type $t:ident = |$a:ident: $item:ty, $b:ident, $op:ty| $image:expr) => {
+        enum $t {}
+        impl Action for $t {
+            type Item = $item;
+            type Operator = $op;
+            fn image($a: &$item, $b: &$op) -> $item {
+                $op
             }
         }
     };
