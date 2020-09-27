@@ -63,3 +63,61 @@ macro_rules! define_action {
         }
     };
 }
+
+/// # Example
+/// ```
+/// define_for_lazy_seg_tree! {
+///     impl (Monoid, Monoid, Action) for (M, O, A) {
+///         type Item = u64;
+///         type Operator = (u64, u64);
+///         fn id_it() = 0;
+///         fn prod_it(a, b) = a + b;
+///         fn id_op() = (1, 0);
+///         fn prod_op(a, b) = (a.0 * b.0, a.1 * b.0 + b.1);
+///         fn image(a, b) = a * b.0 + b.1;
+///     }
+/// }
+/// ```
+#[macro_export]
+macro_rules! define_for_lazy_seg_tree {
+    (
+        impl (Monoid, Monoid, Action) for ($m:ident, $o:ident, $a:ident) {
+            type Item = $it:ty;
+            type Operator = $op:ty;
+            fn id_it() = $ii_res:expr;
+            fn prod_it($pi_a:ident, $pi_b:ident) = $pi_res:expr;
+            fn id_op() = $io_res:expr;
+            fn prod_op($po_a:ident, $po_b:ident) = $po_res:expr;
+            fn image($im_a:ident, $im_b:ident) = $im_res:expr;
+        }
+    ) => {
+        enum $m {}
+        enum $o {}
+        enum $a {}
+        impl crate::algebra::Monoid for $m {
+            type Item = $it;
+            fn id() -> $it {
+                $ii_res
+            }
+            fn prod($pi_a: &$it, $pi_b: &$it) -> $it {
+                $pi_res
+            }
+        }
+        impl crate::algebra::Monoid for $o {
+            type Item = $op;
+            fn id() -> $op {
+                $io_res
+            }
+            fn prod($po_a: &$op, $po_b: &$op) -> $op {
+                $po_res
+            }
+        }
+        impl crate::algebra::Action for $a {
+            type Item = $it;
+            type Operator = $op;
+            fn image($im_a: &$it, $im_b: &$op) -> $it {
+                $im_res
+            }
+        }
+    };
+}
