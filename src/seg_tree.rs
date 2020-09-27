@@ -1,5 +1,6 @@
 use super::algebra::Monoid;
 use super::util::range_from;
+use std::iter::FromIterator;
 use std::ops::{Range, RangeBounds};
 
 /// 便利な列 `st`
@@ -154,5 +155,11 @@ impl<M: Monoid> From<&[M::Item]> for SegTree<M> {
                 child: Some(Box::new((left, right))),
             }
         }
+    }
+}
+
+impl<M: Monoid> FromIterator<M::Item> for SegTree<M> {
+    fn from_iter<I: IntoIterator<Item = M::Item>>(iter: I) -> Self {
+        Self::from(&iter.into_iter().collect::<Vec<_>>()[..])
     }
 }
