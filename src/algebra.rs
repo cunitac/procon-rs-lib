@@ -79,7 +79,7 @@ macro_rules! define_action {
 /// }
 /// ```
 #[macro_export]
-macro_rules! define_for_lazy_seg_tree {
+macro_rules! define_monoids_action {
     (
         impl (Monoid, Monoid, Action) for ($m:ident, $o:ident, $a:ident) {
             type Item = $it:ty;
