@@ -21,8 +21,8 @@ impl<M: Monoid> SegTree<M> {
         if self.len == 1 {
             return self.val = v;
         }
-        let mid = self.len / 2;
         let (left, right) = self.child.as_mut().unwrap().as_mut();
+        let mid = left.len;
         if i < mid {
             left.set(i, v);
         } else {
@@ -46,8 +46,8 @@ impl<M: Monoid> SegTree<M> {
         if end - start == self.len {
             return self.val.clone();
         }
-        let mid = self.len / 2;
         let (left, right) = self.child.as_ref().unwrap().as_ref();
+        let mid = left.len;
         if end <= mid {
             left.fold_inner(start, end)
         } else if mid <= start {
@@ -84,8 +84,8 @@ impl<M: Monoid> SegTree<M> {
         } else if start == self.len {
             return self.len;
         }
-        let mid = self.len / 2;
         let (left, right) = self.child.as_ref().unwrap().as_ref();
+        let mid = left.len
         if start < mid {
             let res_left = left.max_end_inner(start, pred, acc);
             if res_left < mid {
@@ -122,8 +122,8 @@ impl<M: Monoid> SegTree<M> {
         } else if end == 0 {
             return 0;
         }
-        let mid = self.len / 2;
         let (left, right) = self.child.as_ref().unwrap().as_ref();
+        let mid = left.len;
         if mid <= end {
             let res_right = right.min_start_inner(end - mid, pred, acc);
             if res_right > 0 {
