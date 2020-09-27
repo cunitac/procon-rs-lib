@@ -91,7 +91,7 @@ where
         }
         self.val = M::prod(&left.real_val(), &right.real_val());
     }
-    /// `lst[range].iter().fold(M::id(), |a, b| M::prod(&a, b))
+    /// `lst[range].iter().fold(M::id(), |a, b| M::prod(&a, b))`
     pub fn fold(&mut self, range: impl RangeBounds<usize>) -> M::Item {
         let Range { start, end } = range_from(range, self.len);
         if start == end {
@@ -152,4 +152,5 @@ where
 {
     fn from_iter<I: IntoIterator<Item = M::Item>>(iter: I) -> Self {
         Self::from(&Vec::from_iter(iter)[..])
-    }}
+    }
+}
