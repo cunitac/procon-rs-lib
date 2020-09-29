@@ -43,7 +43,9 @@ pub enum LazySegTree<K: LazySegTreeKind> {
 impl<K: LazySegTreeKind> From<&[K::Item]> for LazySegTree<K> {
     fn from(slice: &[K::Item]) -> Self {
         if slice.len() == 1 {
-            Self::Leaf { val: slice[0].clone() }
+            Self::Leaf {
+                val: slice[0].clone(),
+            }
         } else {
             let mid = slice.len() / 2;
             let left = Self::from(&slice[..mid]);
@@ -67,7 +69,14 @@ impl<K: LazySegTreeKind> LazySegTree<K> {
     fn propagate(&mut self) {
         match self {
             Self::Leaf { .. } => return,
-            Self::Node { len, prod, lazy, left, right, .. } => {
+            Self::Node {
+                len,
+                prod,
+                lazy,
+                left,
+                right,
+                ..
+            } => {
                 if lazy.is_none() {
                     return;
                 }
@@ -81,7 +90,9 @@ impl<K: LazySegTreeKind> LazySegTree<K> {
     fn compose_lazy(&mut self, op: &K::Operator) {
         match self {
             Self::Leaf { val } => K::operate(val, op),
-            Self::Node { lazy: Some(lazy), .. } => *lazy = K::composition(lazy, op),
+            Self::Node {
+                lazy: Some(lazy), ..
+            } => *lazy = K::composition(lazy, op),
             Self::Node { lazy, .. } => *lazy = Some(op.clone()),
         }
     }
@@ -89,12 +100,16 @@ impl<K: LazySegTreeKind> LazySegTree<K> {
     pub fn prod(&mut self) -> &K::Item {
         match self {
             Self::Leaf { val } => return val,
-            Self::Node { prod, lazy: None, .. } => return prod,
+            Self::Node {
+                prod, lazy: None, ..
+            } => return prod,
             _ => (),
         };
         self.propagate();
         match self {
-            Self::Node { prod, lazy: None, .. } => prod,
+            Self::Node {
+                prod, lazy: None, ..
+            } => prod,
             _ => unreachable!(),
         }
     }
@@ -126,7 +141,9 @@ impl<K: LazySegTreeKind> LazySegTree<K> {
         self.propagate();
         match self {
             Self::Leaf { val } => *val = v,
-            Self::Node { prod, left, right, .. } => {
+            Self::Node {
+                prod, left, right, ..
+            } => {
                 let mid = left.len();
                 if i < mid {
                     left.set(i, v)
@@ -149,7 +166,9 @@ impl<K: LazySegTreeKind> LazySegTree<K> {
         self.propagate();
         match self {
             Self::Leaf { val } => K::operate(val, op),
-            Self::Node { len, left, right, .. } => {
+            Self::Node {
+                len, left, right, ..
+            } => {
                 if start + *len == end {
                     return self.compose_lazy(op);
                 }
@@ -177,7 +196,13 @@ impl<K: LazySegTreeKind> LazySegTree<K> {
         self.propagate();
         match self {
             Self::Leaf { val } => val.clone(),
-            Self::Node { len, prod, left, right, .. } => {
+            Self::Node {
+                len,
+                prod,
+                left,
+                right,
+                ..
+            } => {
                 if start + *len == end {
                     return prod.clone();
                 }
@@ -187,7 +212,10 @@ impl<K: LazySegTreeKind> LazySegTree<K> {
                 } else if mid <= start {
                     right.prod_range_inner(start - mid, end - mid)
                 } else {
-                    K::prod(&left.prod_range_inner(start, mid), &right.prod_range_inner(0, end - mid))
+                    K::prod(
+                        &left.prod_range_inner(start, mid),
+                        &right.prod_range_inner(0, end - mid),
+                    )
                 }
             }
         }

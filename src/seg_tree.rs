@@ -59,7 +59,7 @@ impl<K: SegTreeKind> SegTree<K> {
         assert!(i < self.len(), "index out: {}/{}", i, self.len());
         match self {
             Self::Leaf { val } => *val = v,
-            Self::Node { left, right, prod, .. } => {
+            Self::Node { left, right, .. } => {
                 let mid = left.len();
                 if i < mid {
                     left.set(i, v)
@@ -75,14 +75,19 @@ impl<K: SegTreeKind> SegTree<K> {
         if start == end {
             return K::id();
         }
-        self.prod_range_inner(start, end).clone()
+        self.prod_range_inner(start, end)
     }
-    fn prod_range_inner(&self, start: usize, end: usize) -> &K::Item {
+    fn prod_range_inner(&self, start: usize, end: usize) -> K::Item {
         match self {
-            Self::Leaf { val } => val,
-            Self::Node { len, prod, left, right } => {
+            Self::Leaf { val } => val.clone(),
+            Self::Node {
+                len,
+                prod,
+                left,
+                right,
+            } => {
                 if start + len == end {
-                    return prod;
+                    return prod.clone();
                 }
                 let mid = left.len();
                 if end <= mid {
@@ -90,7 +95,10 @@ impl<K: SegTreeKind> SegTree<K> {
                 } else if mid <= start {
                     right.prod_range_inner(start - mid, end - mid)
                 } else {
-                    &K::prod(left.prod_range_inner(start, end), right.prod_range_inner(start, end))
+                    K::prod(
+                        &left.prod_range_inner(start, end),
+                        &right.prod_range_inner(start, end),
+                    )
                 }
             }
         }
@@ -120,7 +128,9 @@ impl<K: SegTreeKind> SegTree<K> {
                     0
                 }
             }
-            Self::Node { prod, left, right, .. } => {
+            Self::Node {
+                prod, left, right, ..
+            } => {
                 let merged = K::prod(acc, prod);
                 if pred(&merged) {
                     *acc = merged;
@@ -164,7 +174,9 @@ impl<K: SegTreeKind> SegTree<K> {
                     1
                 }
             }
-            Self::Node { prod, left, right, .. } => {
+            Self::Node {
+                prod, left, right, ..
+            } => {
                 let merged = K::prod(prod, acc);
                 if pred(&merged) {
                     *acc = merged;
@@ -204,7 +216,9 @@ impl<K: SegTreeKind> SegTree<K> {
 impl<M: SegTreeKind> From<&[M::Item]> for SegTree<M> {
     fn from(slice: &[M::Item]) -> Self {
         if slice.len() == 1 {
-            Self::Leaf { val: slice[0].clone() }
+            Self::Leaf {
+                val: slice[0].clone(),
+            }
         } else {
             let mid = slice.len() / 2;
             let left = Self::from(&slice[..mid]);
