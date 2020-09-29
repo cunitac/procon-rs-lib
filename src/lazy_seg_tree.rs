@@ -1,156 +1,217 @@
-use super::algebra::{Action, Monoid};
-use super::util::range_from;
-use std::iter::FromIterator;
-use std::marker::PhantomData;
-use std::ops::{Range, RangeBounds};
+use std::{
+    iter::FromIterator,
+    ops::{Bound, Range, RangeBounds},
+};
 
-type BoxPair<T> = Box<(T, T)>;
-
-/// 便利な列 `lst`
-pub struct LazySegTree<M: Monoid, O: Monoid, A> {
-    len: usize,
-    val: M::Item,
-    lazy: O::Item,
-    child: Option<BoxPair<LazySegTree<M, O, A>>>,
-    phantom: PhantomData<A>,
+pub trait LazySegTreeKind {
+    type Item: Clone;
+    type Operator: Clone;
+    fn id() -> Self::Item;
+    fn prod(a: &Self::Item, b: &Self::Item) -> Self::Item;
+    fn composition(a: &Self::Operator, b: &Self::Operator) -> Self::Operator;
+    /// 長さ `1` と見なす．
+    fn operate(val: &mut Self::Item, op: &Self::Operator) {
+        Self::operate_with_len(val, op, 1)
+    }
+    fn operate_with_len(val: &mut Self::Item, op: &Self::Operator, _len: usize) {
+        Self::operate(val, op)
+    }
+    /// 長さ `1` と見なす．
+    fn image(val: &Self::Item, op: &Self::Operator) -> Self::Item {
+        Self::image_with_len(val, op, 1)
+    }
+    fn image_with_len(val: &Self::Item, op: &Self::Operator, len: usize) -> Self::Item {
+        let mut val = val.clone();
+        Self::operate_with_len(&mut val, op, len);
+        val
+    }
 }
 
-impl<M: Monoid, O: Monoid, A> LazySegTree<M, O, A>
-where
-    A: Action<Item = M::Item, Operator = O::Item>,
-{
-    /// `[M::id(); n]`
+pub enum LazySegTree<K: LazySegTreeKind> {
+    Leaf {
+        val: K::Item,
+    },
+    Node {
+        len: usize,
+        prod: K::Item,
+        lazy: Option<K::Operator>,
+        left: Box<Self>,
+        right: Box<Self>,
+    },
+}
+
+impl<K: LazySegTreeKind> From<&[K::Item]> for LazySegTree<K> {
+    fn from(slice: &[K::Item]) -> Self {
+        if slice.len() == 1 {
+            Self::Leaf { val: slice[0].clone() }
+        } else {
+            let mid = slice.len() / 2;
+            let left = Self::from(&slice[..mid]);
+            let right = Self::from(&slice[mid..]);
+            Self::Node {
+                len: slice.len(),
+                prod: K::id(),
+                lazy: None,
+                left: Box::new(left),
+                right: Box::new(right),
+            }
+        }
+    }
+}
+
+impl<K: LazySegTreeKind> LazySegTree<K> {
+    /// `K::id_item()` が `n` 個
     pub fn new(n: usize) -> Self {
-        Self::from(&vec![M::id(); n][..])
+        Self::from(&vec![K::id(); n][..])
     }
     fn propagate(&mut self) {
-        A::act(&mut self.val, &self.lazy);
-        if let Some(child) = self.child.as_mut() {
-            let (left, right) = child.as_mut();
-            O::op_from_right(&mut left.lazy, &self.lazy);
-            O::op_from_right(&mut right.lazy, &self.lazy);
+        match self {
+            Self::Leaf { .. } => return,
+            Self::Node { len, prod, lazy, left, right, .. } => {
+                if lazy.is_none() {
+                    return;
+                }
+                let lazy = lazy.as_ref().take().unwrap();
+                K::operate_with_len(prod, lazy, *len);
+                left.compose_lazy(lazy);
+                right.compose_lazy(lazy);
+            }
         }
-        self.lazy = O::id();
     }
-    fn real_val(&self) -> M::Item {
-        A::image(&self.val, &self.lazy)
+    fn compose_lazy(&mut self, op: &K::Operator) {
+        match self {
+            Self::Leaf { val } => K::operate(val, op),
+            Self::Node { lazy: Some(lazy), .. } => *lazy = K::composition(lazy, op),
+            Self::Node { lazy, .. } => *lazy = Some(op.clone()),
+        }
     }
-    /// `lst[i]`
-    pub fn get(&mut self, i: usize) -> &M::Item {
-        assert!(i < self.len, "index out: {}/{}", i, self.len);
+    /// 全要素の積
+    pub fn prod(&mut self) -> &K::Item {
+        match self {
+            Self::Leaf { val } => return val,
+            Self::Node { prod, lazy: None, .. } => return prod,
+            _ => (),
+        };
         self.propagate();
-        if self.len == 1 {
-            return &self.val;
-        }
-        let mid = self.len / 2;
-        let (left, right) = self.child.as_mut().unwrap().as_mut();
-        if i < mid {
-            left.get(i)
-        } else {
-            right.get(i - mid)
+        match self {
+            Self::Node { prod, lazy: None, .. } => prod,
+            _ => unreachable!(),
         }
     }
-    /// `lst[i] = v`
-    pub fn set(&mut self, i: usize, v: M::Item) {
-        assert!(i < self.len, "index out: {}/{}", i, self.len);
+    fn len(&self) -> usize {
+        match self {
+            Self::Leaf { .. } => 1,
+            Self::Node { len, .. } => *len,
+        }
+    }
+    /// `i` 番目を得る
+    pub fn get(&mut self, i: usize) -> &K::Item {
+        assert!(i < self.len(), "index out: {}/{}", i, self.len());
         self.propagate();
-        if self.len == 1 {
-            return self.val = v;
+        match self {
+            Self::Leaf { val } => val,
+            Self::Node { left, right, .. } => {
+                let mid = left.len();
+                if i < mid {
+                    left.get(i)
+                } else {
+                    right.get(i - mid)
+                }
+            }
         }
-        let mid = self.len / 2;
-        let (left, right) = self.child.as_mut().unwrap().as_mut();
-        if i < mid {
-            left.set(i, v);
-        } else {
-            right.set(i - mid, v);
-        }
-        self.val = M::prod(&left.val, &right.val);
     }
-    /// `lst[range].iter_mut().for_each(|x| A::act(x, op)`
-    pub fn act(&mut self, range: impl RangeBounds<usize>, op: &O::Item) {
-        let Range { start, end } = range_from(range, self.len);
+    /// `i` 番目を `v` にする
+    pub fn set(&mut self, i: usize, v: K::Item) {
+        assert!(i < self.len(), "index out: {}/{}", i, self.len());
+        self.propagate();
+        match self {
+            Self::Leaf { val } => *val = v,
+            Self::Node { prod, left, right, .. } => {
+                let mid = left.len();
+                if i < mid {
+                    left.set(i, v)
+                } else {
+                    right.set(i - mid, v)
+                }
+                *prod = K::prod(left.prod(), right.prod());
+            }
+        }
+    }
+    /// 添え字範囲 `range` に `|x| K::operate(x, op)` をする
+    pub fn operate(&mut self, range: impl RangeBounds<usize>, op: &K::Operator) {
+        let Range { start, end } = self.range_from(range);
         if start == end {
             return;
         }
-        self.act_inner(start, end, op);
+        self.operate_inner(start, end, op);
     }
-    fn act_inner(&mut self, start: usize, end: usize, op: &O::Item) {
+    fn operate_inner(&mut self, start: usize, end: usize, op: &K::Operator) {
         self.propagate();
-        if end - start == self.len {
-            return self.lazy = op.clone();
+        match self {
+            Self::Leaf { val } => K::operate(val, op),
+            Self::Node { len, left, right, .. } => {
+                if start + *len == end {
+                    return self.compose_lazy(op);
+                }
+                let mid = left.len();
+                if end <= mid {
+                    left.operate_inner(start, end, op);
+                } else if mid <= start {
+                    right.operate_inner(start - mid, end - mid, op);
+                } else {
+                    left.operate_inner(start, mid, op);
+                    right.operate_inner(0, end - mid, op);
+                }
+            }
         }
-        let mid = self.len / 2;
-        let (left, right) = self.child.as_mut().unwrap().as_mut();
-        if end <= mid {
-            left.act_inner(start, end, op);
-        } else if mid <= start {
-            right.act_inner(start - mid, end - mid, op);
-        } else {
-            left.act_inner(start, mid, op);
-            right.act_inner(0, end - mid, op);
-        }
-        self.val = M::prod(&left.real_val(), &right.real_val());
     }
     /// `lst[range].iter().fold(M::id(), |a, b| M::prod(&a, b))`
-    pub fn fold(&mut self, range: impl RangeBounds<usize>) -> M::Item {
-        let Range { start, end } = range_from(range, self.len);
+    pub fn prod_range(&mut self, range: impl RangeBounds<usize>) -> K::Item {
+        let Range { start, end } = self.range_from(range);
         if start == end {
-            return M::id();
+            return K::id();
         }
-        self.fold_inner(start, end)
+        self.prod_range_inner(start, end).clone()
     }
-    fn fold_inner(&mut self, start: usize, end: usize) -> M::Item {
+    fn prod_range_inner(&mut self, start: usize, end: usize) -> K::Item {
         self.propagate();
-        if end - start == self.len {
-            return self.val.clone();
+        match self {
+            Self::Leaf { val } => val.clone(),
+            Self::Node { len, prod, left, right, .. } => {
+                if start + *len == end {
+                    return prod.clone();
+                }
+                let mid = left.len();
+                if end <= mid {
+                    left.prod_range_inner(start, end)
+                } else if mid <= start {
+                    right.prod_range_inner(start - mid, end - mid)
+                } else {
+                    K::prod(&left.prod_range_inner(start, mid), &right.prod_range_inner(0, end - mid))
+                }
+            }
         }
-        let mid = self.len / 2;
-        let (left, right) = self.child.as_mut().unwrap().as_mut();
-        if end <= mid {
-            left.fold_inner(start, end)
-        } else if mid <= start {
-            right.fold_inner(start - mid, end - mid)
-        } else {
-            M::prod(
-                &left.fold_inner(start, mid),
-                &right.fold_inner(0, end - mid),
-            )
-        }
+    }
+    fn range_from(&self, range: impl RangeBounds<usize>) -> Range<usize> {
+        use Bound::*;
+        let start = match range.start_bound() {
+            Included(&a) => a,
+            Excluded(&a) => a + 1,
+            Unbounded => 0,
+        };
+        let end = match range.end_bound() {
+            Excluded(&a) => a,
+            Included(&a) => a + 1,
+            Unbounded => self.len(),
+        };
+        assert!(start <= end, "invalid range: {}..{}", start, end);
+        assert!(end <= self.len(), "index out: {}/{}", end, self.len());
+        Range { start, end }
     }
 }
 
-impl<M: Monoid, O: Monoid, A> From<&[M::Item]> for LazySegTree<M, O, A>
-where
-    A: Action<Item = M::Item, Operator = O::Item>,
-{
-    fn from(slice: &[M::Item]) -> Self {
-        if slice.len() == 1 {
-            return Self {
-                len: 1,
-                val: slice[0].clone(),
-                lazy: O::id(),
-                child: None,
-                phantom: PhantomData,
-            };
-        }
-        let mid = slice.len() / 2;
-        let left = Self::from(&slice[..mid]);
-        let right = Self::from(&slice[mid..]);
-        Self {
-            len: slice.len(),
-            val: M::prod(&left.val, &right.val),
-            lazy: O::id(),
-            child: Some(Box::new((left, right))),
-            phantom: PhantomData,
-        }
-    }
-}
-
-impl<M: Monoid, O: Monoid, A> FromIterator<M::Item> for LazySegTree<M, O, A>
-where
-    A: Action<Item = M::Item, Operator = O::Item>,
-{
-    fn from_iter<I: IntoIterator<Item = M::Item>>(iter: I) -> Self {
-        Self::from(&Vec::from_iter(iter)[..])
+impl<K: LazySegTreeKind> FromIterator<K::Item> for LazySegTree<K> {
+    fn from_iter<I: IntoIterator<Item = K::Item>>(iter: I) -> Self {
+        Self::from(&iter.into_iter().collect::<Vec<_>>()[..])
     }
 }
