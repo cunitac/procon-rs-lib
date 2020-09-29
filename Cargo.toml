@@ -61,7 +61,7 @@ edition = "2018"
 #superslice = "=1.0.0"
 
 # イテレータの拡張
-itertools = "=0.9.0"
+#itertools = "=0.9.0"
 
 # イテレータの拡張（一次元累積和と浮動小数点数の等差数列）
 #itertools-num = "=0.1.3"
@@ -82,7 +82,7 @@ itertools = "=0.9.0"
 #bitset-fixed = "=0.1.0"
 
 # 競技プログラミングの入出力サポートその1
-proconio = { version = "=0.3.6", features = ["derive"] }
+#proconio = { version = "=0.3.6", features = ["derive"] }
 
 # 競技プログラミングの入出力サポートその2
 #text_io = "=0.1.8"

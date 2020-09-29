@@ -1,164 +1,225 @@
-use super::algebra::Monoid;
-use super::util::range_from;
-use std::iter::FromIterator;
-use std::ops::{Range, RangeBounds};
+use std::{
+    iter::FromIterator,
+    ops::{Bound, Range, RangeBounds},
+};
 
-/// 便利な列 `st`
-pub struct SegTree<M: Monoid> {
-    len: usize,
-    val: M::Item,
-    child: Option<Box<(SegTree<M>, SegTree<M>)>>,
+pub trait SegTreeKind {
+    type Item: Clone;
+    fn id() -> Self::Item;
+    fn prod(a: &Self::Item, b: &Self::Item) -> Self::Item;
 }
 
-impl<M: Monoid> SegTree<M> {
-    /// `st = [M::id(); n]`
+pub enum SegTree<M: SegTreeKind> {
+    Leaf {
+        val: M::Item,
+    },
+    Node {
+        len: usize,
+        prod: M::Item,
+        left: Box<Self>,
+        right: Box<Self>,
+    },
+}
+
+impl<K: SegTreeKind> SegTree<K> {
+    /// `K::id()` が `n` 個
     pub fn new(n: usize) -> Self {
-        Self::from(&vec![M::id(); n][..])
+        Self::from(&vec![K::id(); n][..])
     }
-    /// `st[i] = v`
-    pub fn set(&mut self, i: usize, v: M::Item) {
-        assert!(i < self.len, "index out: {}/{}", i, self.len);
-        if self.len == 1 {
-            return self.val = v;
+    fn len(&self) -> usize {
+        match self {
+            Self::Leaf { .. } => 1,
+            Self::Node { len, .. } => *len,
         }
-        let (left, right) = self.child.as_mut().unwrap().as_mut();
-        let mid = left.len;
-        if i < mid {
-            left.set(i, v);
-        } else {
-            right.set(i - mid, v);
+    }
+    /// 全要素の積 O(1)
+    pub fn prod(&self) -> &K::Item {
+        match self {
+            Self::Leaf { val } => val,
+            Self::Node { prod, .. } => prod,
         }
-        self.val = M::prod(&left.val, &right.val);
     }
-    /// `st[i]`
-    pub fn get(&self, i: usize) -> M::Item {
-        self.fold(i..=i)
+    /// `i` 番目を得る O(log n)
+    pub fn get(&self, i: usize) -> &K::Item {
+        assert!(i < self.len(), "index out: {}/{}", i, self.len());
+        match self {
+            Self::Leaf { val } => val,
+            Self::Node { left, right, .. } => {
+                let mid = left.len();
+                if i < mid {
+                    left.get(i)
+                } else {
+                    right.get(i)
+                }
+            }
+        }
     }
-    /// `st[range].iter().fold(M::id(), |a, b| M::prod(&a, b))`
-    pub fn fold(&self, range: impl RangeBounds<usize>) -> M::Item {
-        let Range { start, end } = range_from(range, self.len);
+    /// `i` 番目を `v` にする O(log n)
+    pub fn set(&mut self, i: usize, v: K::Item) {
+        assert!(i < self.len(), "index out: {}/{}", i, self.len());
+        match self {
+            Self::Leaf { val } => *val = v,
+            Self::Node { left, right, prod, .. } => {
+                let mid = left.len();
+                if i < mid {
+                    left.set(i, v)
+                } else {
+                    right.set(i - mid, v)
+                }
+            }
+        }
+    }
+    /// 添字範囲 `range` の要素の積 O(log n)
+    pub fn prod_range(&self, range: impl RangeBounds<usize>) -> K::Item {
+        let Range { start, end } = self.range_from(range);
         if start == end {
-            return M::id();
+            return K::id();
         }
-        self.fold_inner(start, end)
+        self.prod_range_inner(start, end).clone()
     }
-    fn fold_inner(&self, start: usize, end: usize) -> M::Item {
-        if end - start == self.len {
-            return self.val.clone();
-        }
-        let (left, right) = self.child.as_ref().unwrap().as_ref();
-        let mid = left.len;
-        if end <= mid {
-            left.fold_inner(start, end)
-        } else if mid <= start {
-            right.fold_inner(start - mid, end - mid)
-        } else {
-            M::prod(
-                &left.fold_inner(start, mid),
-                &right.fold_inner(0, end - mid),
-            )
+    fn prod_range_inner(&self, start: usize, end: usize) -> &K::Item {
+        match self {
+            Self::Leaf { val } => val,
+            Self::Node { len, prod, left, right } => {
+                if start + len == end {
+                    return prod;
+                }
+                let mid = left.len();
+                if end <= mid {
+                    left.prod_range_inner(start, end)
+                } else if mid <= start {
+                    right.prod_range_inner(start - mid, end - mid)
+                } else {
+                    &K::prod(left.prod_range_inner(start, end), right.prod_range_inner(start, end))
+                }
+            }
         }
     }
-    /// `pred(st.fold(start..end))` なる最大の `end`
-    /// `pred(M::id())` が要請される
+    /// `pred(self.prod_range(start..end))` なる最大の `end`
+    /// `pred(K::id())` が要請される
     pub fn max_end<P>(&self, start: usize, mut pred: P) -> usize
     where
-        P: FnMut(&M::Item) -> bool,
+        P: FnMut(&K::Item) -> bool,
     {
-        assert!(start <= self.len, "index out: {}/{}", start, self.len);
-        let mut acc = M::id();
+        assert!(start <= self.len(), "index out: {}/{}", start, self.len());
+        if start == self.len() {
+            return start;
+        }
+        let mut acc = K::id();
         self.max_end_inner(start, &mut pred, &mut acc)
     }
-    fn max_end_inner<P>(&self, start: usize, pred: &mut P, acc: &mut M::Item) -> usize
+    fn max_end_inner<P>(&self, start: usize, pred: &mut P, acc: &mut K::Item) -> usize
     where
-        P: FnMut(&M::Item) -> bool,
+        P: FnMut(&K::Item) -> bool,
     {
-        if start == 0 {
-            let merged = M::prod(acc, &self.val);
-            if pred(&merged) {
-                *acc = merged;
-                return self.len;
-            } else if self.len == 1 {
-                return 0;
+        match self {
+            Self::Leaf { val } => {
+                if pred(&K::prod(val, acc)) {
+                    1
+                } else {
+                    0
+                }
             }
-        } else if start == self.len {
-            return self.len;
-        }
-        let (left, right) = self.child.as_ref().unwrap().as_ref();
-        let mid = left.len
-        if start < mid {
-            let res_left = left.max_end_inner(start, pred, acc);
-            if res_left < mid {
-                res_left
-            } else {
-                mid + right.max_end_inner(0, pred, acc)
+            Self::Node { prod, left, right, .. } => {
+                let merged = K::prod(acc, prod);
+                if pred(&merged) {
+                    *acc = merged;
+                    return self.len();
+                }
+                let mid = left.len();
+                if mid <= start {
+                    return mid + right.max_end_inner(start - mid, pred, acc);
+                }
+                let res_l = left.max_end_inner(start, pred, acc);
+                if res_l != mid {
+                    res_l
+                } else {
+                    mid + right.max_end_inner(0, pred, acc)
+                }
             }
-        } else {
-            mid + right.max_end_inner(start - mid, pred, acc)
         }
     }
-    /// `pred(st.fold(start..end))` なる最小の `start`
-    /// `pred(M::id())` が要請される
+    /// `pred(self.prod_range(start..end))` なる最小の `start`
+    /// `pred(K::id())` が要請される
     pub fn min_start<P>(&self, end: usize, mut pred: P) -> usize
     where
-        P: FnMut(&M::Item) -> bool,
+        P: FnMut(&K::Item) -> bool,
     {
-        assert!(end <= self.len, "index out: {}/{}", end, self.len);
-        let mut acc = M::id();
-        self.min_start_inner(end, &mut pred, &mut acc)
-    }
-    fn min_start_inner<P>(&self, end: usize, pred: &mut P, acc: &mut M::Item) -> usize
-    where
-        P: FnMut(&M::Item) -> bool,
-    {
-        if end == self.len {
-            let merged = M::prod(acc, &self.val);
-            if pred(&merged) {
-                *acc = merged;
-                return 0;
-            } else if self.len == 1 {
-                return 1;
-            }
-        } else if end == 0 {
+        assert!(end <= self.len(), "index out: {}/{}", end, self.len());
+        if end == 0 {
             return 0;
         }
-        let (left, right) = self.child.as_ref().unwrap().as_ref();
-        let mid = left.len;
-        if mid <= end {
-            let res_right = right.min_start_inner(end - mid, pred, acc);
-            if res_right > 0 {
-                mid + res_right
-            } else {
-                left.min_start_inner(mid, pred, acc)
+        let mut acc = K::id();
+        self.min_start_inner(end, &mut pred, &mut acc)
+    }
+    fn min_start_inner<P>(&self, end: usize, pred: &mut P, acc: &mut K::Item) -> usize
+    where
+        P: FnMut(&K::Item) -> bool,
+    {
+        match self {
+            Self::Leaf { val } => {
+                if pred(&K::prod(val, acc)) {
+                    0
+                } else {
+                    1
+                }
             }
-        } else {
-            left.min_start_inner(end, pred, acc)
+            Self::Node { prod, left, right, .. } => {
+                let merged = K::prod(prod, acc);
+                if pred(&merged) {
+                    *acc = merged;
+                    return 0;
+                }
+                let mid = left.len();
+                if end <= mid {
+                    return left.min_start_inner(end, pred, acc);
+                }
+                let res_right = right.min_start_inner(end - mid, pred, acc);
+                if res_right != 0 {
+                    res_right
+                } else {
+                    left.min_start_inner(mid, pred, acc)
+                }
+            }
         }
+    }
+    fn range_from(&self, range: impl RangeBounds<usize>) -> Range<usize> {
+        use Bound::*;
+        let start = match range.start_bound() {
+            Included(&a) => a,
+            Excluded(&a) => a + 1,
+            Unbounded => 0,
+        };
+        let end = match range.end_bound() {
+            Excluded(&a) => a,
+            Included(&a) => a + 1,
+            Unbounded => self.len(),
+        };
+        assert!(start <= end, "invalid range: {}..{}", start, end);
+        assert!(end <= self.len(), "index out: {}/{}", end, self.len());
+        Range { start, end }
     }
 }
 
-impl<M: Monoid> From<&[M::Item]> for SegTree<M> {
+impl<M: SegTreeKind> From<&[M::Item]> for SegTree<M> {
     fn from(slice: &[M::Item]) -> Self {
         if slice.len() == 1 {
-            SegTree {
-                len: 1,
-                val: slice[0].clone(),
-                child: None,
-            }
+            Self::Leaf { val: slice[0].clone() }
         } else {
             let mid = slice.len() / 2;
             let left = Self::from(&slice[..mid]);
             let right = Self::from(&slice[mid..]);
-            Self {
+            Self::Node {
                 len: slice.len(),
-                val: M::prod(&left.val, &right.val),
-                child: Some(Box::new((left, right))),
+                prod: M::prod(&left.prod(), &right.prod()),
+                left: Box::new(left),
+                right: Box::new(right),
             }
         }
     }
 }
 
-impl<M: Monoid> FromIterator<M::Item> for SegTree<M> {
+impl<M: SegTreeKind> FromIterator<M::Item> for SegTree<M> {
     fn from_iter<I: IntoIterator<Item = M::Item>>(iter: I) -> Self {
         Self::from(&iter.into_iter().collect::<Vec<_>>()[..])
     }
