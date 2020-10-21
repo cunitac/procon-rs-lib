@@ -3,13 +3,13 @@ use std::{
     ops::{Bound, Range, RangeBounds},
 };
 
-pub trait SegTreeType {
+pub trait Type {
     type Item: Clone;
     fn id() -> Self::Item;
     fn prod(a: &Self::Item, b: &Self::Item) -> Self::Item;
 }
 
-pub enum SegTree<T: SegTreeType> {
+pub enum SegTree<T: Type> {
     Leaf {
         val: T::Item,
     },
@@ -21,7 +21,7 @@ pub enum SegTree<T: SegTreeType> {
     },
 }
 
-impl<T: SegTreeType> SegTree<T> {
+impl<T: Type> SegTree<T> {
     /// `K::id()` が `n` 個
     pub fn new(n: usize) -> Self {
         assert_ne!(n, 0, "segment tree must not be empty.");
@@ -234,7 +234,7 @@ fn range_from(len: usize, range: impl RangeBounds<usize>) -> Range<usize> {
     Range { start, end }
 }
 
-impl<T: SegTreeType> From<&[T::Item]> for SegTree<T> {
+impl<T: Type> From<&[T::Item]> for SegTree<T> {
     fn from(slice: &[T::Item]) -> Self {
         if slice.len() == 1 {
             Self::Leaf {
@@ -254,7 +254,7 @@ impl<T: SegTreeType> From<&[T::Item]> for SegTree<T> {
     }
 }
 
-impl<T: SegTreeType> FromIterator<T::Item> for SegTree<T> {
+impl<T: Type> FromIterator<T::Item> for SegTree<T> {
     fn from_iter<I: IntoIterator<Item = T::Item>>(iter: I) -> Self {
         Self::from(&iter.into_iter().collect::<Vec<_>>()[..])
     }
