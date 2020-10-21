@@ -3,7 +3,7 @@ use std::{
     ops::{Bound, Range, RangeBounds},
 };
 
-pub trait LazySegTreeKind {
+pub trait LazySegTreeType {
     type Item: Clone;
     type Operator: Clone;
     fn id() -> Self::Item;
@@ -16,32 +16,23 @@ pub trait LazySegTreeKind {
     fn operate_with_len(val: &mut Self::Item, op: &Self::Operator, _len: usize) {
         Self::operate(val, op)
     }
-    /// 長さ `1` と見なす．
-    fn image(val: &Self::Item, op: &Self::Operator) -> Self::Item {
-        Self::image_with_len(val, op, 1)
-    }
-    fn image_with_len(val: &Self::Item, op: &Self::Operator, len: usize) -> Self::Item {
-        let mut val = val.clone();
-        Self::operate_with_len(&mut val, op, len);
-        val
-    }
 }
 
-pub enum LazySegTree<K: LazySegTreeKind> {
+pub enum LazySegTree<T: LazySegTreeType> {
     Leaf {
-        val: K::Item,
+        val: T::Item,
     },
     Node {
         len: usize,
-        prod: K::Item,
-        lazy: Option<K::Operator>,
+        prod: T::Item,
+        lazy: Option<T::Operator>,
         left: Box<Self>,
         right: Box<Self>,
     },
 }
 
-impl<K: LazySegTreeKind> From<&[K::Item]> for LazySegTree<K> {
-    fn from(slice: &[K::Item]) -> Self {
+impl<T: LazySegTreeType> From<&[T::Item]> for LazySegTree<T> {
+    fn from(slice: &[T::Item]) -> Self {
         if slice.len() == 1 {
             Self::Leaf {
                 val: slice[0].clone(),
@@ -52,7 +43,7 @@ impl<K: LazySegTreeKind> From<&[K::Item]> for LazySegTree<K> {
             let right = Self::from(&slice[mid..]);
             Self::Node {
                 len: slice.len(),
-                prod: K::id(),
+                prod: T::id(),
                 lazy: None,
                 left: Box::new(left),
                 right: Box::new(right),
@@ -61,43 +52,41 @@ impl<K: LazySegTreeKind> From<&[K::Item]> for LazySegTree<K> {
     }
 }
 
-impl<K: LazySegTreeKind> LazySegTree<K> {
+impl<T: LazySegTreeType> LazySegTree<T> {
     /// `K::id_item()` が `n` 個
     pub fn new(n: usize) -> Self {
-        Self::from(&vec![K::id(); n][..])
+        Self::from(&vec![T::id(); n][..])
     }
     fn propagate(&mut self) {
         match self {
-            Self::Leaf { .. } => return,
+            Self::Leaf { .. } => (),
             Self::Node {
-                len,
                 prod,
+                len,
                 lazy,
                 left,
                 right,
                 ..
             } => {
-                if lazy.is_none() {
-                    return;
+                if let Some(lazy) = lazy.as_ref().take() {
+                    T::operate_with_len(prod, lazy, *len);
+                    left.compose_lazy(lazy);
+                    right.compose_lazy(lazy);
                 }
-                let lazy = lazy.as_ref().take().unwrap();
-                K::operate_with_len(prod, lazy, *len);
-                left.compose_lazy(lazy);
-                right.compose_lazy(lazy);
             }
         }
     }
-    fn compose_lazy(&mut self, op: &K::Operator) {
+    fn compose_lazy(&mut self, op: &T::Operator) {
         match self {
-            Self::Leaf { val } => K::operate(val, op),
+            Self::Leaf { val } => T::operate(val, op),
             Self::Node {
                 lazy: Some(lazy), ..
-            } => *lazy = K::composition(lazy, op),
+            } => *lazy = T::composition(lazy, op),
             Self::Node { lazy, .. } => *lazy = Some(op.clone()),
         }
     }
     /// 全要素の積
-    pub fn prod(&mut self) -> &K::Item {
+    pub fn prod(&mut self) -> &T::Item {
         match self {
             Self::Leaf { val } => return val,
             Self::Node {
@@ -120,7 +109,7 @@ impl<K: LazySegTreeKind> LazySegTree<K> {
         }
     }
     /// `i` 番目を得る
-    pub fn get(&mut self, i: usize) -> &K::Item {
+    pub fn get(&mut self, i: usize) -> &T::Item {
         assert!(i < self.len(), "index out: {}/{}", i, self.len());
         self.propagate();
         match self {
@@ -136,7 +125,7 @@ impl<K: LazySegTreeKind> LazySegTree<K> {
         }
     }
     /// `i` 番目を `v` にする
-    pub fn set(&mut self, i: usize, v: K::Item) {
+    pub fn set(&mut self, i: usize, v: T::Item) {
         assert!(i < self.len(), "index out: {}/{}", i, self.len());
         self.propagate();
         match self {
@@ -150,22 +139,22 @@ impl<K: LazySegTreeKind> LazySegTree<K> {
                 } else {
                     right.set(i - mid, v)
                 }
-                *prod = K::prod(left.prod(), right.prod());
+                *prod = T::prod(left.prod(), right.prod());
             }
         }
     }
     /// 添え字範囲 `range` に `|x| K::operate(x, op)` をする
-    pub fn operate(&mut self, range: impl RangeBounds<usize>, op: &K::Operator) {
+    pub fn operate(&mut self, range: impl RangeBounds<usize>, op: &T::Operator) {
         let Range { start, end } = self.range_from(range);
         if start == end {
             return;
         }
         self.operate_inner(start, end, op);
     }
-    fn operate_inner(&mut self, start: usize, end: usize, op: &K::Operator) {
+    fn operate_inner(&mut self, start: usize, end: usize, op: &T::Operator) {
         self.propagate();
         match self {
-            Self::Leaf { val } => K::operate(val, op),
+            Self::Leaf { val } => T::operate(val, op),
             Self::Node {
                 len, left, right, ..
             } => {
@@ -185,14 +174,14 @@ impl<K: LazySegTreeKind> LazySegTree<K> {
         }
     }
     /// `lst[range].iter().fold(M::id(), |a, b| M::prod(&a, b))`
-    pub fn prod_range(&mut self, range: impl RangeBounds<usize>) -> K::Item {
+    pub fn prod_range(&mut self, range: impl RangeBounds<usize>) -> T::Item {
         let Range { start, end } = self.range_from(range);
         if start == end {
-            return K::id();
+            return T::id();
         }
         self.prod_range_inner(start, end).clone()
     }
-    fn prod_range_inner(&mut self, start: usize, end: usize) -> K::Item {
+    fn prod_range_inner(&mut self, start: usize, end: usize) -> T::Item {
         self.propagate();
         match self {
             Self::Leaf { val } => val.clone(),
@@ -212,7 +201,7 @@ impl<K: LazySegTreeKind> LazySegTree<K> {
                 } else if mid <= start {
                     right.prod_range_inner(start - mid, end - mid)
                 } else {
-                    K::prod(
+                    T::prod(
                         &left.prod_range_inner(start, mid),
                         &right.prod_range_inner(0, end - mid),
                     )
@@ -238,7 +227,7 @@ impl<K: LazySegTreeKind> LazySegTree<K> {
     }
 }
 
-impl<K: LazySegTreeKind> FromIterator<K::Item> for LazySegTree<K> {
+impl<K: LazySegTreeType> FromIterator<K::Item> for LazySegTree<K> {
     fn from_iter<I: IntoIterator<Item = K::Item>>(iter: I) -> Self {
         Self::from(&iter.into_iter().collect::<Vec<_>>()[..])
     }
