@@ -3,7 +3,7 @@ use std::{
     ops::{Bound, Range, RangeBounds},
 };
 
-pub trait LazySegTreeType {
+pub trait Type {
     type Item: Clone;
     type Operator: Clone;
     fn id() -> Self::Item;
@@ -18,7 +18,7 @@ pub trait LazySegTreeType {
     }
 }
 
-pub enum LazySegTree<T: LazySegTreeType> {
+pub enum LazySegTree<T: Type> {
     Leaf {
         val: T::Item,
     },
@@ -31,7 +31,7 @@ pub enum LazySegTree<T: LazySegTreeType> {
     },
 }
 
-impl<T: LazySegTreeType> From<&[T::Item]> for LazySegTree<T> {
+impl<T: Type> From<&[T::Item]> for LazySegTree<T> {
     fn from(slice: &[T::Item]) -> Self {
         if slice.len() == 1 {
             Self::Leaf {
@@ -52,7 +52,7 @@ impl<T: LazySegTreeType> From<&[T::Item]> for LazySegTree<T> {
     }
 }
 
-impl<T: LazySegTreeType> LazySegTree<T> {
+impl<T: Type> LazySegTree<T> {
     /// `K::id_item()` が `n` 個
     pub fn new(n: usize) -> Self {
         Self::from(&vec![T::id(); n][..])
@@ -227,7 +227,7 @@ impl<T: LazySegTreeType> LazySegTree<T> {
     }
 }
 
-impl<K: LazySegTreeType> FromIterator<K::Item> for LazySegTree<K> {
+impl<K: Type> FromIterator<K::Item> for LazySegTree<K> {
     fn from_iter<I: IntoIterator<Item = K::Item>>(iter: I) -> Self {
         Self::from(&iter.into_iter().collect::<Vec<_>>()[..])
     }
