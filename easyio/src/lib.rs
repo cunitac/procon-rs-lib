@@ -107,7 +107,7 @@ impl<'a, R, I> IIter<'a, R, I> {
 impl<R: Read, I: Input> Iterator for IIter<'_, R, I> {
     type Item = I::Item;
     fn next(&mut self) -> Option<I::Item> {
-        self.skip_while(|c| c.is_ascii_whitespace())
+        self.skip_while(|c| c.is_ascii_whitespace());
         if self.0.is_empty() {
             None
         } else {
