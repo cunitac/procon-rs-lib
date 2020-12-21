@@ -67,7 +67,7 @@ impl<R: Read> Source<R> {
         self.buf.clear();
         self.src.read_to_end(&mut self.buf).expect("failed to read");
     }
-    /// スキップして空になったらロードしてスキップ、それでも空ならパニック
+    /// スキップして空になったらロードしてスキップ
     pub fn skip_while<P: FnMut(u8) -> bool>(&mut self, mut pred: P) {
         while self.ptr != self.buf.len() && pred(self.buf[self.ptr]) {
             debug_assert!(self.buf[self.ptr].is_ascii(), "invalid src; not ASCII");
@@ -79,7 +79,6 @@ impl<R: Read> Source<R> {
                 debug_assert!(self.buf[self.ptr].is_ascii(), "invalid src; not ASCII");
                 self.ptr += 1;
             }
-            assert!(!self.is_empty(), "source is empty");
         }
     }
     /// 空ならパニックする、ロードはしない
@@ -107,7 +106,7 @@ impl<'a, R, I> IIter<'a, R, I> {
 impl<R: Read, I: Input> Iterator for IIter<'_, R, I> {
     type Item = I::Item;
     fn next(&mut self) -> Option<I::Item> {
-        self.skip_while(|c| c.is_ascii_whitespace());
+        self.0.skip_while(|c| c.is_ascii_whitespace());
         if self.0.is_empty() {
             None
         } else {
@@ -260,7 +259,7 @@ mod test {
         );
         assert_eq!(io.i::<i32>(), 1);
         assert_eq!(io.i::<VecN<i64>>(), vec![1, 2, 3]);
-        assert_eq!(io.i::<VecLn<i64>>(), vec![4, 5, 6]);
+        assert_eq!(io.iiter::<i64>().collect::<Vec<_>>(), vec![4, 5, 6]);
         let a = vec![vec![1], vec![2, 3], vec![4, 5, 6]];
         io.o(Lines(a.iter().map(|row| Words(row))));
         std::mem::drop(io);
