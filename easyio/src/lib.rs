@@ -218,7 +218,7 @@ impl<T: ToString> Output for T {
 
 macro_rules! impl_writable_intoiter_with_delim {
     ($name:ident, $delim:expr) => {
-        pub struct $name<T>(T);
+        pub struct $name<T>(pub T);
         impl<T> Output for $name<T>
         where
             T: IntoIterator,
