@@ -178,7 +178,7 @@ impl_input_tuple!(T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11);
 
 /// `i::<I>`を、直後が`'\n'`か`'\r'`か入力終了になるまでして、`Vec`で返す
 pub enum VecLn<I> {
-    Phantom(PhantomData<dyn Fn() -> I>),
+    Phantom(PhantomData<fn() -> I>),
 }
 impl<I: Input> Input for VecLn<I> {
     type Item = Vec<I::Item>;
@@ -240,25 +240,29 @@ impl_writable_intoiter_with_delim!(Lines, "\n");
 impl_writable_intoiter_with_delim!(Words, " ");
 impl_writable_intoiter_with_delim!(Concat, "");
 
-#[test]
-fn test_input() {
-    let input = &b" 0 -1   2 string cde1\n3 1 2 3 \r 4 5 6"[..];
-    let mut output = Vec::new();
-    let mut io = IO::new(input, &mut output);
-    assert_eq!(io.i::<i32>(), 0);
-    assert_eq!(io.i::<i64>(), -1);
-    assert_eq!(io.i::<Byte>(), b'2');
-    assert_eq!(io.i::<String>(), String::from("string"));
-    assert_eq!(io.i::<char>(), 'c');
-    assert_eq!(
-        io.i_iter::<char>().take(2).collect::<Vec<_>>(),
-        vec!['d', 'e']
-    );
-    assert_eq!(io.i::<i32>(), 1);
-    assert_eq!(io.i::<VecN<i64>>(), vec![1, 2, 3]);
-    assert_eq!(io.i::<VecLn<i64>>(), vec![4, 5, 6]);
-    let a = vec![vec![1], vec![2, 3], vec![4, 5, 6]];
-    io.o(Lines(a.iter().map(|row| Words(row))));
-    std::mem::drop(io);
-    assert_eq!(&output, b"1\n2 3\n4 5 6");
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn test_input() {
+        let input = &b" 0 -1   2 string cde1\n3 1 2 3 \r 4 5 6"[..];
+        let mut output = Vec::new();
+        let mut io = IO::new(input, &mut output);
+        assert_eq!(io.i::<i32>(), 0);
+        assert_eq!(io.i::<i64>(), -1);
+        assert_eq!(io.i::<Byte>(), b'2');
+        assert_eq!(io.i::<String>(), String::from("string"));
+        assert_eq!(io.i::<char>(), 'c');
+        assert_eq!(
+            io.i_iter::<char>().take(2).collect::<Vec<_>>(),
+            vec!['d', 'e']
+        );
+        assert_eq!(io.i::<i32>(), 1);
+        assert_eq!(io.i::<VecN<i64>>(), vec![1, 2, 3]);
+        assert_eq!(io.i::<VecLn<i64>>(), vec![4, 5, 6]);
+        let a = vec![vec![1], vec![2, 3], vec![4, 5, 6]];
+        io.o(Lines(a.iter().map(|row| Words(row))));
+        std::mem::drop(io);
+        assert_eq!(&output, b"1\n2 3\n4 5 6");
+    }
 }
