@@ -24,15 +24,15 @@ impl<R: Read, W: Write> IO<R, W> {
     pub fn i<I: Input>(&mut self) -> I::Item {
         self.src.i::<I>()
     }
-    pub fn i_iter<I: Input>(&mut self) -> IIter<R, I> {
-        self.src.i_iter()
+    pub fn iiter<I: Input>(&mut self) -> IIter<R, I> {
+        self.src.iiter()
     }
     pub fn o<O: Output>(&mut self, item: O) {
         self.buf
             .write_all(item.as_string().as_bytes())
             .expect("failed to write");
     }
-    pub fn o_ln<O: Output>(&mut self, item: O) {
+    pub fn oln<O: Output>(&mut self, item: O) {
         self.o(item);
         self.buf.write_all(b"\n").expect("failed to write");
     }
@@ -59,7 +59,7 @@ impl<R: Read> Source<R> {
     pub fn i<I: Input>(&mut self) -> I::Item {
         I::read_from(self)
     }
-    pub fn i_iter<I: Input>(&mut self) -> IIter<R, I> {
+    pub fn iiter<I: Input>(&mut self) -> IIter<R, I> {
         IIter::new(self)
     }
     pub fn load(&mut self) {
@@ -202,7 +202,7 @@ impl<I: Input> Input for VecN<I> {
     type Item = Vec<I::Item>;
     fn read_from<R: Read>(src: &mut Source<R>) -> Vec<I::Item> {
         let len = src.i::<usize>();
-        src.i_iter::<I>().take(len).collect()
+        src.iiter::<I>().take(len).collect()
     }
 }
 
@@ -254,7 +254,7 @@ mod test {
         assert_eq!(io.i::<String>(), String::from("string"));
         assert_eq!(io.i::<char>(), 'c');
         assert_eq!(
-            io.i_iter::<char>().take(2).collect::<Vec<_>>(),
+            io.iiter::<char>().take(2).collect::<Vec<_>>(),
             vec!['d', 'e']
         );
         assert_eq!(io.i::<i32>(), 1);
