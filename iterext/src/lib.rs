@@ -132,6 +132,28 @@ where
     }
 }
 
+pub fn repeat_app<T, F>(first: T, f: F) -> RepeatApp<T, F>
+where
+    F: FnMut(&T) -> T,
+{
+    RepeatApp { next: first, f }
+}
+pub struct RepeatApp<T, F> {
+    next: T,
+    f: F,
+}
+impl<T, F> Iterator for RepeatApp<T, F>
+where
+    F: FnMut(&T) -> T,
+{
+    type Item = T;
+    fn next(&mut self) -> Option<T> {
+        let mut next = (self.f)(&self.next);
+        std::mem::swap(&mut next, &mut self.next);
+        Some(next)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
