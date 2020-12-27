@@ -15,10 +15,20 @@ pub trait IterExt: Iterator {
             f,
         }
     }
-    /// まとめる
+    fn group_by<F>(self, f: F) -> GroupBy<Self, F>
+    where
+        Self: Sized,
+        F: FnMut(&Self::Item, &Self::Item) -> bool,
+    {
+        GroupBy {
+            iter: self.peekable(),
+            f,
+        }
+    }
     fn group_by_key<K, F>(self, f: F) -> GroupByKey<Self, F>
     where
         Self: Sized,
+        F: FnMut(&Self::Item) -> K,
     {
         GroupByKey {
             iter: self.peekable(),
@@ -81,6 +91,29 @@ where
     }
 }
 
+pub struct GroupBy<I: Iterator, F> {
+    iter: std::iter::Peekable<I>,
+    f: F,
+}
+impl<I, F> Iterator for GroupBy<I, F>
+where
+    I: Iterator,
+    F: FnMut(&I::Item, &I::Item) -> bool,
+{
+    type Item = Vec<I::Item>;
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut group = vec![self.iter.next()?];
+        while let Some(next) = self.iter.peek() {
+            if (self.f)(&group[group.len() - 1], next) {
+                group.push(self.iter.next().unwrap())
+            } else {
+                break;
+            }
+        }
+        Some(group)
+    }
+}
+
 pub struct GroupByKey<I: Iterator, F> {
     iter: std::iter::Peekable<I>,
     f: F,
@@ -106,8 +139,12 @@ where
     }
 }
 
-#[test]
-fn test_accumulate() {
-    let cum: Vec<_> = [1, 2, 3].iter().accumulate(1, |a, b| a * b).collect();
-    assert_eq!(cum, vec![1, 1, 2, 6]);
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn test_accumulate() {
+        let cum: Vec<_> = [1, 2, 3].iter().accumulate(1, |a, b| a * b).collect();
+        assert_eq!(cum, vec![1, 1, 2, 6]);
+    }
 }
