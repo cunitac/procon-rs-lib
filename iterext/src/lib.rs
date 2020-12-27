@@ -58,17 +58,11 @@ pub trait IterExt: Iterator {
     {
         self.sorted_by(|a, b| key(a).cmp(&key(b)))
     }
-    fn collect_vec(self) -> Vec<Self::Item>
+    fn vec(self) -> Vec<Self::Item>
     where
         Self: Sized,
     {
         self.collect()
-    }
-    fn take_vec(self, len: usize) -> Vec<Self::Item>
-    where
-        Self: Sized,
-    {
-        self.take(len).collect()
     }
 }
 
@@ -144,14 +138,14 @@ mod test {
     #[test]
     fn test_sorted() {
         let mut vec = vec![4, 7, 7, 2, 3, 2, 6, 32, 3, 6, 7, 55, 1, 2];
-        let sorted_vec = vec.iter().copied().sorted().collect_vec();
+        let sorted_vec = vec.iter().copied().sorted().vec();
         vec.sort();
         assert_eq!(sorted_vec, vec);
     }
     #[test]
     fn test_sorted_by() {
         let mut vec = vec![4, 7, 7, 2, 3, 2, 6, 32, 3, 6, 7, 55, 1, 2];
-        let sorted_vec = vec.iter().copied().sorted_by(|a, b| b.cmp(a)).collect_vec();
+        let sorted_vec = vec.iter().copied().sorted_by(|a, b| b.cmp(a)).vec();
         vec.sort_by(|a, b| b.cmp(a));
         assert_eq!(sorted_vec, vec);
     }
@@ -162,7 +156,7 @@ mod test {
             .iter()
             .copied()
             .sorted_by_key(|&a| std::cmp::Reverse(a))
-            .collect_vec();
+            .vec();
         vec.sort_by_key(|&a| std::cmp::Reverse(a));
         assert_eq!(sorted_vec, vec);
     }
@@ -174,11 +168,7 @@ mod test {
     #[test]
     fn test_group_by_key() {
         let vec = vec![1_i32, 2, 2, -3, -3, 0, 1, 2, 3, -2];
-        let groups = vec
-            .iter()
-            .copied()
-            .group_by_key(|a| a.signum())
-            .collect_vec();
+        let groups = vec.iter().copied().group_by_key(|a| a.signum()).vec();
         assert_eq!(
             groups,
             vec![
@@ -193,7 +183,7 @@ mod test {
     #[test]
     fn test_group_by() {
         let vec = vec![1_i32, 2, 2, -3, -3, 0, 1, 2, 3, -2];
-        let groups = vec.iter().copied().group_by(|a, b| a < b).collect_vec();
+        let groups = vec.iter().copied().group_by(|a, b| a < b).vec();
         assert_eq!(
             groups,
             vec![

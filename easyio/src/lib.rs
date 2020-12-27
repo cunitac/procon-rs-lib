@@ -26,6 +26,9 @@ impl<R: Read, W: Write> IO<R, W> {
     pub fn iiter<I: Input>(&mut self) -> IIter<R, I> {
         self.src.iiter()
     }
+    pub fn ivec<I: Input>(&mut self, len: usize) -> Vec<I::Item> {
+        self.src.ivec::<I>(len)
+    }
     pub fn o<O: Output>(&mut self, item: O) {
         self.buf
             .write_all(item.as_string().as_bytes())
@@ -60,6 +63,9 @@ impl<R: Read> Source<R> {
     }
     pub fn iiter<I: Input>(&mut self) -> IIter<R, I> {
         IIter::new(self)
+    }
+    pub fn ivec<I: Input>(&mut self, len: usize) -> Vec<I::Item> {
+        self.iiter::<I>().take(len).collect()
     }
     pub fn load(&mut self) {
         self.ptr = 0;
