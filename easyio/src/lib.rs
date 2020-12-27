@@ -8,11 +8,10 @@ pub struct IO<R: Read, W: Write> {
     buf: BufWriter<W>,
 }
 
-impl IO<std::io::Stdin, std::io::Stdout> {
-    pub fn stdio() -> Self {
-        Self::new(std::io::stdin(), std::io::stdout())
-    }
+pub fn stdio() -> IO<std::io::Stdin, std::io::Stdout> {
+    Self::new(std::io::stdin(), std::io::stdout())
 }
+
 impl<R: Read, W: Write> IO<R, W> {
     /// `BufReader`、`BufWriter`を渡す必要はない
     pub fn new(r: R, o: W) -> Self {
