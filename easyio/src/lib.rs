@@ -9,7 +9,7 @@ pub struct IO<R: Read, W: Write> {
 }
 
 pub fn stdio() -> IO<std::io::Stdin, std::io::Stdout> {
-    Self::new(std::io::stdin(), std::io::stdout())
+    IO::new(std::io::stdin(), std::io::stdout())
 }
 
 impl<R: Read, W: Write> IO<R, W> {
