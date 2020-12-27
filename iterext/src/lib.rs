@@ -3,7 +3,6 @@
 impl<I> IterExt for I where I: Iterator {}
 
 pub trait IterExt: Iterator {
-    /// 累積和のようなもの
     fn accumulate<B, F>(self, init: B, f: F) -> Accumulate<Self, B, F>
     where
         F: FnMut(&B, Self::Item) -> B,
@@ -143,8 +142,67 @@ where
 mod test {
     use super::*;
     #[test]
+    fn test_sorted() {
+        let mut vec = vec![4, 7, 7, 2, 3, 2, 6, 32, 3, 6, 7, 55, 1, 2];
+        let sorted_vec = vec.iter().copied().sorted().collect_vec();
+        vec.sort();
+        assert_eq!(sorted_vec, vec);
+    }
+    #[test]
+    fn test_sorted_by() {
+        let mut vec = vec![4, 7, 7, 2, 3, 2, 6, 32, 3, 6, 7, 55, 1, 2];
+        let sorted_vec = vec.iter().copied().sorted_by(|a, b| b.cmp(a)).collect_vec();
+        vec.sort_by(|a, b| b.cmp(a));
+        assert_eq!(sorted_vec, vec);
+    }
+    #[test]
+    fn test_sorted_by_key() {
+        let mut vec = vec![4, 7, 7, 2, 3, 2, 6, 32, 3, 6, 7, 55, 1, 2];
+        let sorted_vec = vec
+            .iter()
+            .copied()
+            .sorted_by_key(|&a| std::cmp::Reverse(a))
+            .collect_vec();
+        vec.sort_by_key(|&a| std::cmp::Reverse(a));
+        assert_eq!(sorted_vec, vec);
+    }
+    #[test]
     fn test_accumulate() {
         let cum: Vec<_> = [1, 2, 3].iter().accumulate(1, |a, b| a * b).collect();
         assert_eq!(cum, vec![1, 1, 2, 6]);
+    }
+    #[test]
+    fn test_group_by_key() {
+        let vec = vec![1_i32, 2, 2, -3, -3, 0, 1, 2, 3, -2];
+        let groups = vec
+            .iter()
+            .copied()
+            .group_by_key(|a| a.signum())
+            .collect_vec();
+        assert_eq!(
+            groups,
+            vec![
+                (1, vec![1, 2, 2]),
+                (-1, vec![-3, -3]),
+                (0, vec![0]),
+                (1, vec![1, 2, 3]),
+                (-1, vec![-2])
+            ]
+        );
+    }
+    #[test]
+    fn test_group_by() {
+        let vec = vec![1_i32, 2, 2, -3, -3, 0, 1, 2, 3, -2];
+        let groups = vec.iter().copied().group_by(|a, b| a < b).collect_vec();
+        assert_eq!(
+            groups,
+            vec![
+                vec![1, 2],
+                vec![2],
+                vec![-3],
+                vec![-3, 0, 1, 2, 3],
+                vec![-2]
+            ]
+        );
     }
 }
