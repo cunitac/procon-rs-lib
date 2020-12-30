@@ -138,6 +138,22 @@ macro_rules! derive_input {
 
 derive_input!(f32, f64, i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize, String);
 
+pub enum Bytes {}
+impl Input for Bytes {
+    type Item = Vec<u8>;
+    fn read_from<R: Read>(src: &mut Source<R>) -> Vec<u8> {
+        src.i::<String>().bytes().collect()
+    }
+}
+
+pub enum Chars {}
+impl Input for Chars {
+    type Item = Vec<char>;
+    fn read_from<R: Read>(src: &mut Source<R>) -> Vec<char> {
+        src.i::<String>().chars().collect()
+    }
+}
+
 pub enum Byte {}
 impl Input for Byte {
     type Item = u8;
@@ -188,6 +204,10 @@ pub enum VecLn<I> {
 impl<I: Input> Input for VecLn<I> {
     type Item = Vec<I::Item>;
     fn read_from<R: Read>(src: &mut Source<R>) -> Vec<I::Item> {
+        if src.is_empty() {
+            src.load();
+            assert!(!src.is_empty());
+        }
         std::iter::from_fn(|| {
             if src.is_empty() || src.buf[src.ptr] == b'\n' || src.buf[src.ptr] == b'\r' {
                 None
@@ -250,13 +270,14 @@ mod test {
     use super::*;
     #[test]
     fn test_input() {
-        let input = &b" 0 -1   2 string cde1\n3 1 2 3 \r 4 5 6"[..];
+        let input = &b" 0 -1   2 string chars\ncde1\n3 1 2 3 \r 4 5 6"[..];
         let mut output = Vec::new();
         let mut io = IO::new(input, &mut output);
         assert_eq!(io.i::<i32>(), 0);
         assert_eq!(io.i::<i64>(), -1);
         assert_eq!(io.i::<Byte>(), b'2');
         assert_eq!(io.i::<String>(), String::from("string"));
+        assert_eq!(io.i::<VecLn<char>>(), "chars".chars().collect::<Vec<_>>());
         assert_eq!(io.i::<char>(), 'c');
         assert_eq!(
             io.iiter::<char>().take(2).collect::<Vec<_>>(),
@@ -266,7 +287,7 @@ mod test {
         assert_eq!(io.i::<VecN<i64>>(), vec![1, 2, 3]);
         assert_eq!(io.iiter::<i64>().collect::<Vec<_>>(), vec![4, 5, 6]);
         let a = vec![vec![1], vec![2, 3], vec![4, 5, 6]];
-        io.o(Lines(a.iter().map(|row| Words(row))));
+        io.o(Lines(a.iter().map(Words)));
         std::mem::drop(io);
         assert_eq!(&output, b"1\n2 3\n4 5 6");
     }
