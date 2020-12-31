@@ -138,6 +138,14 @@ macro_rules! derive_input {
 
 derive_input!(f32, f64, i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize, String);
 
+pub enum Usize1 {}
+impl Input for Usize1 {
+    type Item = usize;
+    fn read_from<R: Read>(src: &mut Source<R>) -> usize {
+        src.i::<usize>() - 1
+    }
+}
+
 pub enum Bytes {}
 impl Input for Bytes {
     type Item = Vec<u8>;
