@@ -64,6 +64,13 @@ pub trait IterExt: Iterator {
     {
         self.collect()
     }
+    /// `Vec` に `collect` してから `rev`
+    fn collect_rev(self) -> std::iter::Rev<std::vec::IntoIter<Self::Item>>
+    where
+        Self: Sized,
+    {
+        self.collect::<Vec<_>>().into_iter().rev()
+    }
 }
 
 pub struct Accumulate<I, B, F> {
