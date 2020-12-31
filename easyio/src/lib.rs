@@ -102,7 +102,7 @@ impl<R: Read> Source<R> {
 }
 
 /// `Iterator<Item=I::Item>`。空になったら`None`を返す。
-pub struct IIter<'a, R, I>(&'a mut Source<R>, PhantomData<dyn Fn() -> I>);
+pub struct IIter<'a, R, I>(&'a mut Source<R>, PhantomData<fn() -> I>);
 impl<'a, R, I> IIter<'a, R, I> {
     fn new(src: &'a mut Source<R>) -> Self {
         Self(src, PhantomData)
@@ -229,7 +229,7 @@ impl<I: Input> Input for VecLn<I> {
 
 /// `i::<usize>`で長さを読んでから`i_vec::<I>`
 pub enum VecN<I> {
-    Phantom(PhantomData<dyn Fn() -> I>),
+    Phantom(PhantomData<fn() -> I>),
 }
 impl<I: Input> Input for VecN<I> {
     type Item = Vec<I::Item>;
