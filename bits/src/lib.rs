@@ -66,36 +66,35 @@ where
 pub struct Iter<B: BitOps>(Bits<B>);
 impl<B: BitOps> Iterator for Iter<B> {
     type Item = usize;
-    fn next(&mut self) -> Option<usize> {
-        let ret = self.min()?;
-        self.0.remove(ret);
-        Some(ret)
-    }
     fn last(self) -> Option<usize> {
         self.max()
     }
-    fn min(self) -> Option<usize> {
+    fn min(mut self) -> Option<usize> {
+        self.next()
+    }
+    fn max(mut self) -> Option<usize> {
+        self.next_back()
+    }
+    fn next(&mut self) -> Option<usize> {
         let tz = (self.0).0.trailing_zeros();
         if tz == B::BIT_SIZE {
             None
         } else {
+            self.0.remove(tz);
             Some(tz)
-        }
-    }
-    fn max(self) -> Option<usize> {
-        let lz = (self.0).0.leading_zeros();
-        if lz == B::BIT_SIZE {
-            None
-        } else {
-            Some(B::BIT_SIZE - lz - 1)
         }
     }
 }
 impl<B: BitOps> DoubleEndedIterator for Iter<B> {
     fn next_back(&mut self) -> Option<usize> {
-        let ret = self.max()?;
-        self.0.remove(ret);
-        Some(ret)
+        let lz = (self.0).0.leading_zeros();
+        if lz == B::BIT_SIZE {
+            None
+        } else {
+            let ret = B::BIT_SIZE - lz - 1;
+            self.0.remove(ret);
+            Some(ret)
+        }
     }
 }
 
@@ -229,7 +228,19 @@ impl_bitops!(u16, 16);
 impl_bitops!(u32, 32);
 impl_bitops!(u64, 64);
 impl_bitops!(u128, 128);
-#[cfg(target_pointer_width = "32")]
-impl_bitops!(usize, 32);
-#[cfg(target_pointer_width = "64")]
-impl_bitops!(usize, 64);
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn test_iter() {
+        let mut v = vec![0, 4, 7, 32, 63];
+        let mut s = Bits::<u64>::default();
+        for &i in &v {
+            s.insert(i);
+        }
+        assert_eq!(v, s.iter().collect::<Vec<_>>());
+        v.reverse();
+        assert_eq!(v, s.iter().rev().collect::<Vec<_>>());
+    }
+}
