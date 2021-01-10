@@ -1,10 +1,10 @@
 use std::ops::{
-    Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not, Shl, Sub,
-    SubAssign,
+    Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Index, Not,
+    Shl, Sub, SubAssign,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct Bits<B: BitsBase = u32>(pub B);
+pub struct Bits<B: BitsBase = usize>(pub B);
 
 impl<B: BitsBase> Bits<B> {
     pub fn new() -> Self {
@@ -91,6 +91,7 @@ impl<B: BitsBase> SubAssign for Bits<B> {
 }
 
 /// `Bits + usize`は`Bits | single_bit(usize)`
+#[allow(clippy::suspicious_arithmetic_impl)]
 impl<B: BitsBase> Add<usize> for Bits<B> {
     type Output = Self;
     fn add(self, rhs: usize) -> Self {
@@ -115,7 +116,7 @@ impl<B: BitsBase> SubAssign<usize> for Bits<B> {
     }
 }
 
-impl<B: BitsBase> std::ops::Index<usize> for Bits<B> {
+impl<B: BitsBase> Index<usize> for Bits<B> {
     type Output = bool;
     fn index(&self, i: usize) -> &bool {
         const TRUE: bool = true;
@@ -245,8 +246,11 @@ pub trait BitsBase:
     fn trailing_zeros(self) -> usize;
     fn leading_zeros(self) -> usize;
 }
-impl BitsBase for u32 {
+impl BitsBase for usize {
+    #[cfg(target_pointer_width = "32")]
     const SIZE: usize = 32;
+    #[cfg(target_pointer_width = "64")]
+    const SIZE: usize = 64;
     fn wrapping_sub(self, rhs: Self) -> Self {
         self.wrapping_sub(rhs)
     }
