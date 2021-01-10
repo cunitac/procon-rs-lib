@@ -196,6 +196,7 @@ pub trait BitOps:
     + Shr<usize, Output = Self>
     + ShrAssign<usize>
     + Not<Output = Self>
+    + Sub<Output = Self>
     + SubAssign
 {
     const BIT_SIZE: usize;
