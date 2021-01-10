@@ -37,6 +37,9 @@ impl<B: BitOps> Bits<B> {
     pub fn clear(&mut self) {
         self.0 = B::ZERO;
     }
+    pub fn complement_with_len(self, len: usize) -> Self {
+        Self(!self.0 & ((B::ONE << len) - B::ONE))
+    }
     /// 降順
     pub fn subsets(self) -> impl Iterator<Item = Self> {
         std::iter::successors(Some(self), move |&(mut bits)| {
