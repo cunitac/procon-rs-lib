@@ -7,14 +7,11 @@ pub struct Timer {
 }
 
 impl Timer {
-    pub fn new(duration: Duration) -> Self {
+    pub fn new(millis: u64) -> Self {
         Self {
             begin: Instant::now(),
-            duration,
+            duration: Duration::from_millis(millis),
         }
-    }
-    pub fn from_millis(millis: u64) -> Self {
-        Self::new(Duration::from_millis(millis))
     }
     /// `duration` を `1.0` として
     pub fn now(&self) -> f64 {
@@ -24,11 +21,11 @@ impl Timer {
         Instant::now() >= self.begin + self.duration
     }
     /// 現在から、「このタイマーの `begin` から `duration` 後」までのタイマー
-    pub fn subtimer(&self, duration: Duration) -> Self {
+    pub fn subtimer(&self, millis: u64) -> Self {
         let now = Instant::now();
         Self {
             begin: now,
-            duration: duration - (now - self.begin),
+            duration: Duration::from_millis(millis) - (now - self.begin),
         }
     }
 }
