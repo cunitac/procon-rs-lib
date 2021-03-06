@@ -23,6 +23,14 @@ impl Timer {
     pub fn end(&self) -> bool {
         Instant::now() >= self.begin + self.duration
     }
+    /// 現在から、「このタイマーの `begin` から `duration` 後」までのタイマー
+    pub fn subtimer(&self, duration: Duration) -> Self {
+        let now = Instant::now();
+        Self {
+            begin: now,
+            duration: duration - (now - self.begin),
+        }
+    }
 }
 
 #[cfg(test)]
