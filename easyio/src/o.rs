@@ -1,6 +1,9 @@
-use std::{
-    fmt::{self, Display},
-    io::{self, prelude::*, BufWriter},
+use {
+    marker::*,
+    std::{
+        fmt::{self, Display},
+        io::{self, prelude::*, BufWriter},
+    },
 };
 
 /// BufWriter のラッパ
@@ -14,7 +17,7 @@ impl<W: Write> Printer<W> {
             writer: BufWriter::new(output),
         }
     }
-    pub fn print(&mut self, val: impl Display) {
+    pub fn print<T: Display>(&mut self, val: T) {
         write!(self, "{}", val).unwrap()
     }
 }
@@ -38,12 +41,12 @@ pub mod marker {
     use super::*;
 
     macro_rules! display_with_delim {
-        ($f:ident: &mut Formatter; $($type:ident, $delim:expr);* $(;)+) => {$(
-            pub struct $type<I>(pub I);
-            impl<I> Display for $type<I>
+        ($f:ident: &mut Formatter; $($type:ident, $delim:expr;)*) => {$(
+            pub struct $type<'a, I>(pub &'a I);
+            impl<'a, I> Display for $type<'a, I>
             where
-                for<'a> &'a I: IntoIterator,
-                for<'a> <&'a I as IntoIterator>::Item: Display,
+                &'a I: IntoIterator,
+                <&'a I as IntoIterator>::Item: Display,
             {
                 fn fmt(&self, $f: &mut fmt::Formatter<'_>) -> fmt::Result {
                     let mut iter = self.0.into_iter();
@@ -53,7 +56,7 @@ pub mod marker {
                     iter.try_for_each(|v| $delim.and_then(|_| v.fmt($f)))
                 }
             }
-        )*}
+        )*};
     }
 
     display_with_delim! {
@@ -61,5 +64,21 @@ pub mod marker {
         Lines, writeln!(f);
         Words, write!(f, " ");
         Concat, fmt::Result::Ok(());
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test() {
+        let mut output = Vec::new();
+
+        let mut printer = Printer::new(&mut output);
+        printer.print(Lines(&[1, 2, 3]));
+        std::mem::drop(printer);
+
+        assert_eq!(output, b"1\n2\n3")
     }
 }
