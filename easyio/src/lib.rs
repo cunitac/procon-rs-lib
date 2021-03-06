@@ -7,5 +7,6 @@ pub mod prelude {
         o::{marker::*, Printer},
     };
     use std::io::{StdinLock, StdoutLock};
-    pub type Stdio<'a> = (Source<StdinLock<'a>>, Printer<StdoutLock<'a>>);
+    pub type IO<R, W> = (Source<R>, Printer<W>);
+    pub type Stdio<'a> = IO<StdinLock<'a>, StdoutLock<'a>>;
 }
