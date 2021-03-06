@@ -20,6 +20,9 @@ impl<W: Write> Printer<W> {
     pub fn print<T: Display>(&mut self, val: T) {
         write!(self, "{}", val).unwrap()
     }
+    pub fn println<T: Display>(&mut self, val: T) {
+        writeln!(self, "{}", val).unwrap()
+    }
 }
 
 impl<W: Write> Write for Printer<W> {
