@@ -6,6 +6,12 @@ macro_rules! capture {
     ) => {
         capture_inner!([][$($ca)*,] fn $name($($arg)*) -> $ret $body)
     };
+    (
+        #[capture($($ca:tt)*)]
+        fn $name:ident($($arg:tt)*) $body:block
+    ) => {
+        capture_inner!([][$($ca)*,] fn $name($($arg)*) -> () $body)
+    };
 }
 
 #[macro_export]
@@ -53,6 +59,15 @@ macro_rules! memoise {
     };
     (fn $name:ident($($arg:tt)*) -> $ret:ty $body:block) => {
         memoise_inner!([][] fn $name($($arg)*) -> $ret $body)
+    };
+    (
+        #[capture($($ca:tt)*)]
+        fn $name:ident($($arg:tt)*) $body:block
+    ) => {
+        memoise_inner!([][$($ca)*,] fn $name($($arg)*) -> () $body)
+    };
+    (fn $name:ident($($arg:tt)*) $body:block) => {
+        memoise_inner!([][] fn $name($($arg)*) -> () $body)
     };
 }
 
