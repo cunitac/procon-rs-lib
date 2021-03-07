@@ -1,20 +1,4 @@
 #[macro_export]
-macro_rules! capture {
-    (
-        #[capture($($ca:tt)*)]
-        fn $name:ident($($arg:tt)*) -> $ret:ty $body:block
-    ) => {
-        capture_inner!([][$($ca)*,] fn $name($($arg)*) -> $ret $body)
-    };
-    (
-        #[capture($($ca:tt)*)]
-        fn $name:ident($($arg:tt)*) $body:block
-    ) => {
-        capture_inner!([][$($ca)*,] fn $name($($arg)*) -> () $body)
-    };
-}
-
-#[macro_export]
 macro_rules! capture_inner {
     (
         [$(($g:ident, $ga:expr, $gt:ty))*][]
@@ -50,24 +34,18 @@ macro_rules! capture_inner {
 }
 
 #[macro_export]
-macro_rules! memoise {
+macro_rules! capture {
     (
         #[capture($($ca:tt)*)]
         fn $name:ident($($arg:tt)*) -> $ret:ty $body:block
     ) => {
-        memoise_inner!([][$($ca)*,] fn $name($($arg)*) -> $ret $body)
-    };
-    (fn $name:ident($($arg:tt)*) -> $ret:ty $body:block) => {
-        memoise_inner!([][] fn $name($($arg)*) -> $ret $body)
+        capture_inner!([][$($ca)*,] fn $name($($arg)*) -> $ret $body)
     };
     (
         #[capture($($ca:tt)*)]
         fn $name:ident($($arg:tt)*) $body:block
     ) => {
-        memoise_inner!([][$($ca)*,] fn $name($($arg)*) -> () $body)
-    };
-    (fn $name:ident($($arg:tt)*) $body:block) => {
-        memoise_inner!([][] fn $name($($arg)*) -> () $body)
+        capture_inner!([][$($ca)*,] fn $name($($arg)*) -> () $body)
     };
 }
 
@@ -109,5 +87,27 @@ macro_rules! memoise_inner {
     };
     ([$($done:tt)*][$g:ident: $gt:ty, $($rest:tt)*] $($info:tt)*) => {
         memoise_inner!([$($done)* ($g, $g, $gt)][$($rest)*]$($info)*)
+    };
+}
+
+#[macro_export]
+macro_rules! memoise {
+    (
+        #[capture($($ca:tt)*)]
+        fn $name:ident($($arg:tt)*) -> $ret:ty $body:block
+    ) => {
+        memoise_inner!([][$($ca)*,] fn $name($($arg)*) -> $ret $body)
+    };
+    (fn $name:ident($($arg:tt)*) -> $ret:ty $body:block) => {
+        memoise_inner!([][] fn $name($($arg)*) -> $ret $body)
+    };
+    (
+        #[capture($($ca:tt)*)]
+        fn $name:ident($($arg:tt)*) $body:block
+    ) => {
+        memoise_inner!([][$($ca)*,] fn $name($($arg)*) -> () $body)
+    };
+    (fn $name:ident($($arg:tt)*) $body:block) => {
+        memoise_inner!([][] fn $name($($arg)*) -> () $body)
     };
 }
