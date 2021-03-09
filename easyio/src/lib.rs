@@ -3,7 +3,7 @@ pub mod o;
 
 pub mod prelude {
     pub use super::{
-        i::{marker::*, Source},
+        i::{marker::*, FromSource, Source},
         o::{marker::*, Printer},
     };
     use std::io::{StdinLock, StdoutLock};
