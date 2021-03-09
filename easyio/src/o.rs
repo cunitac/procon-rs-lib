@@ -1,9 +1,6 @@
-use {
-    marker::*,
-    std::{
-        fmt::{self, Display},
-        io::{self, prelude::*, BufWriter},
-    },
+use std::{
+    fmt::{self, Display},
+    io::{self, prelude::*, BufWriter},
 };
 
 /// BufWriter のラッパ
@@ -72,7 +69,7 @@ pub mod marker {
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    use super::{marker::*, *};
 
     #[test]
     fn test() {
