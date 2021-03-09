@@ -27,7 +27,7 @@ impl<R: Read> Source<R> {
         self.cursor = 0;
         self.source.read_to_end(&mut self.buffer).unwrap()
     }
-    pub fn read<I: Input>(&mut self) -> I::Item {
+    pub fn read<I: FromSource>(&mut self) -> I::Item {
         I::read_from(self).unwrap()
     }
     pub fn next_token(&mut self) -> Option<&str> {
@@ -55,7 +55,7 @@ impl<R: Read> Source<R> {
     }
 }
 
-pub trait Input {
+pub trait FromSource {
     type Item;
     /// `source` が空だった場合に限って `None`。
     fn read_from<R: Read>(source: &mut Source<R>) -> Option<Self::Item>;
@@ -94,7 +94,7 @@ impl_primitive_input! {
     u8, u16, u32, u64, u128, usize,
 }
 
-impl Input for char {
+impl FromSource for char {
     type Item = char;
     fn read_from<R: Read>(source: &mut Source<R>) -> Option<char> {
         Byte::read_from(source).map(|v| v as char)
@@ -104,14 +104,14 @@ impl Input for char {
 pub mod marker {
     use super::*;
     pub enum Usize1 {}
-    impl Input for Usize1 {
+    impl FromSource for Usize1 {
         type Item = usize;
         fn read_from<R: Read>(source: &mut Source<R>) -> Option<usize> {
             usize::read_from(source).map(|u| u - 1)
         }
     }
     pub enum Byte {}
-    impl Input for Byte {
+    impl FromSource for Byte {
         type Item = u8;
         fn read_from<R: Read>(source: &mut Source<R>) -> Option<u8> {
             source.skip_while(|b| b.is_ascii_whitespace());
@@ -125,14 +125,14 @@ pub mod marker {
         }
     }
     pub enum Bytes {}
-    impl Input for Bytes {
+    impl FromSource for Bytes {
         type Item = Vec<u8>;
         fn read_from<R: Read>(source: &mut Source<R>) -> Option<Vec<u8>> {
             source.next_token().map(|s| s.bytes().collect())
         }
     }
     pub enum Chars {}
-    impl Input for Chars {
+    impl FromSource for Chars {
         type Item = Vec<char>;
         fn read_from<R: Read>(source: &mut Source<R>) -> Option<Vec<char>> {
             source.next_token().map(|s| s.chars().collect())
@@ -164,7 +164,7 @@ pub struct Iter<'a, I, R> {
     _phantom: PhantomData<fn() -> I>,
 }
 
-impl<'a, I: Input, R: Read> Iter<'a, I, R> {
+impl<'a, I: FromSource, R: Read> Iter<'a, I, R> {
     fn new(source: &'a mut Source<R>) -> Self {
         Self {
             source,
@@ -173,7 +173,7 @@ impl<'a, I: Input, R: Read> Iter<'a, I, R> {
     }
 }
 
-impl<R: Read, I: Input> Iterator for Iter<'_, I, R> {
+impl<R: Read, I: FromSource> Iterator for Iter<'_, I, R> {
     type Item = I::Item;
     fn next(&mut self) -> Option<I::Item> {
         I::read_from(&mut self.source)
@@ -181,10 +181,10 @@ impl<R: Read, I: Input> Iterator for Iter<'_, I, R> {
 }
 
 impl<R: Read> Source<R> {
-    pub fn iter<I: Input>(&mut self) -> Iter<'_, I, R> {
+    pub fn iter<I: FromSource>(&mut self) -> Iter<'_, I, R> {
         Iter::new(self)
     }
-    pub fn vec<I: Input>(&mut self, len: usize) -> Vec<I::Item> {
+    pub fn vec<I: FromSource>(&mut self, len: usize) -> Vec<I::Item> {
         self.iter::<I>().take(len).collect()
     }
 }
