@@ -64,7 +64,7 @@ pub trait FromSource {
 macro_rules! impl_tuple_input {
     () => {};
     ($t0:ident, $($t:ident,)*) => {
-        impl<$t0: Input, $($t: Input),*> Input for ($t0, $($t),*) {
+        impl<$t0: FromSource, $($t: FromSource),*> FromSource for ($t0, $($t),*) {
             type Item = ($t0::Item, $($t::Item),*);
             fn read_from<R: Read>(source: &mut Source<R>) -> Option<Self::Item> {
                 Some(($t0::read_from(source)?, $($t::read_from(source)?),*))
@@ -78,7 +78,7 @@ impl_tuple_input!(T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11,);
 
 macro_rules! impl_primitive_input {
     ($($t:ty),* $(,)+) => {$(
-        impl Input for $t {
+        impl FromSource for $t {
             type Item = $t;
             fn read_from<R: Read>(source: &mut Source<R>) -> Option<$t> {
                 source.next_token().map(|s| s.parse().unwrap())
@@ -142,7 +142,7 @@ pub mod marker {
 
 macro_rules! alias_input {
     ($($name:ident, $input:ty);* $(;)+) => {$(
-        pub fn $name(&mut self) -> <$input as Input>::Item {
+        pub fn $name(&mut self) -> <$input as FromSource>::Item {
             self.read::<$input>()
         }
     )*};
