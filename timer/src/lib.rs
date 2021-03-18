@@ -33,6 +33,9 @@ impl Timer {
             duration: Duration::from_secs_f64(secs) - self.elapsed_duration(),
         }
     }
+    pub fn subtimer_ratio(&self, ratio: f64) -> Self {
+        self.subtimer(self.duration.as_secs_f64() * ratio)
+    }
     fn elapsed_duration(&self) -> Duration {
         Instant::now() - self.begin
     }
