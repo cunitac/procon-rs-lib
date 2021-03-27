@@ -1,5 +1,5 @@
 use {
-    marker::*,
+    self::marker::*,
     std::{io::prelude::*, marker::PhantomData},
 };
 
