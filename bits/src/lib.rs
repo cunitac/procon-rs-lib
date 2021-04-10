@@ -1,28 +1,34 @@
 use std::ops::{
     Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Index, Not,
-    Shl, Sub, SubAssign,
+    Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct Bits<B: BitsBase = usize>(pub B);
+pub struct Bits(usize);
 
-impl<B: BitsBase> Bits<B> {
+impl Bits {
+    #[cfg(target_pointer_width = "32")]
+    const CAPACITY: usize = 32;
+    #[cfg(target_pointer_width = "64")]
+    const CAPACITY: usize = 64;
+
     pub fn new() -> Self {
-        Self(B::zero())
+        Self(0)
     }
     pub fn filled(len: usize) -> Self {
-        Self(B::ones(len))
+        if len == Self::CAPACITY {
+            Self(!0)
+        } else {
+            Self((1 << len) - 1)
+        }
     }
     pub fn complement(self, len: usize) -> Self {
-        !self & Self::filled(len)
+        Self(!self.0 & Self::filled(len).0)
     }
     pub fn single_bit(i: usize) -> Self {
-        Self(B::one() << i)
+        Self(1 << i)
     }
-    pub fn set_bits(self) -> SetBits<B> {
-        SetBits::new(self)
-    }
-    pub fn sub_bits(self) -> SubBits<B> {
+    pub fn sub_bits(self) -> SubBits {
         SubBits::new(self)
     }
     pub fn super_bits(self, len: usize) -> impl Iterator<Item = Self> + DoubleEndedIterator {
@@ -33,161 +39,198 @@ impl<B: BitsBase> Bits<B> {
     }
 }
 
-impl<B: BitsBase> Default for Bits<B> {
+impl Default for Bits {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<B: BitsBase> Not for Bits<B> {
+impl Not for Bits {
     type Output = Self;
     fn not(self) -> Self {
         Bits(!self.0)
     }
 }
-impl<B: BitsBase> BitOr for Bits<B> {
+impl BitOr for Bits {
     type Output = Self;
     fn bitor(self, rhs: Self) -> Self {
         Bits(self.0 | rhs.0)
     }
 }
-impl<B: BitsBase> BitOrAssign for Bits<B> {
+impl BitOrAssign for Bits {
     fn bitor_assign(&mut self, rhs: Self) {
         self.0 |= rhs.0
     }
 }
-impl<B: BitsBase> BitAnd for Bits<B> {
+impl BitAnd for Bits {
     type Output = Self;
     fn bitand(self, rhs: Self) -> Self {
         Bits(self.0 & rhs.0)
     }
 }
-impl<B: BitsBase> BitAndAssign for Bits<B> {
+impl BitAndAssign for Bits {
     fn bitand_assign(&mut self, rhs: Self) {
         self.0 &= rhs.0
     }
 }
-impl<B: BitsBase> BitXor for Bits<B> {
+impl BitXor for Bits {
     type Output = Self;
     fn bitxor(self, rhs: Self) -> Self {
         Bits(self.0 ^ rhs.0)
     }
 }
-impl<B: BitsBase> BitXorAssign for Bits<B> {
+impl BitXorAssign for Bits {
     fn bitxor_assign(&mut self, rhs: Self) {
         self.0 ^= rhs.0
     }
 }
-impl<B: BitsBase> Sub for Bits<B> {
+impl Sub for Bits {
     type Output = Self;
     fn sub(self, rhs: Self) -> Self {
         self & !rhs
     }
 }
-impl<B: BitsBase> SubAssign for Bits<B> {
+impl SubAssign for Bits {
     fn sub_assign(&mut self, rhs: Self) {
         *self &= !rhs
     }
 }
 
+impl<T> Shl<T> for Bits
+where
+    usize: Shl<T, Output = usize>,
+{
+    type Output = Self;
+    fn shl(self, rhs: T) -> Self {
+        Self(self.0 << rhs)
+    }
+}
+impl<T> ShlAssign<T> for Bits
+where
+    usize: ShlAssign<T>,
+{
+    fn shl_assign(&mut self, rhs: T) {
+        self.0 <<= rhs;
+    }
+}
+impl<T> Shr<T> for Bits
+where
+    usize: Shr<T, Output = usize>,
+{
+    type Output = Self;
+    fn shr(self, rhs: T) -> Self {
+        Self(self.0 >> rhs)
+    }
+}
+impl<T> ShrAssign<T> for Bits
+where
+    usize: ShrAssign<T>,
+{
+    fn shr_assign(&mut self, rhs: T) {
+        self.0 >>= rhs;
+    }
+}
+
 /// `Bits + usize`は`Bits | single_bit(usize)`
 #[allow(clippy::suspicious_arithmetic_impl)]
-impl<B: BitsBase> Add<usize> for Bits<B> {
+impl Add<usize> for Bits {
     type Output = Self;
     fn add(self, rhs: usize) -> Self {
         self | Self::single_bit(rhs)
     }
 }
-impl<B: BitsBase> AddAssign<usize> for Bits<B> {
+impl AddAssign<usize> for Bits {
     fn add_assign(&mut self, rhs: usize) {
         *self |= Self::single_bit(rhs)
     }
 }
 /// `Bits - usize`は`Bits - single_bit(usize)`
-impl<B: BitsBase> Sub<usize> for Bits<B> {
+impl Sub<usize> for Bits {
     type Output = Self;
     fn sub(self, rhs: usize) -> Self {
         self - Self::single_bit(rhs)
     }
 }
-impl<B: BitsBase> SubAssign<usize> for Bits<B> {
+impl SubAssign<usize> for Bits {
     fn sub_assign(&mut self, rhs: usize) {
         *self -= Self::single_bit(rhs)
     }
 }
 
-impl<B: BitsBase> Index<usize> for Bits<B> {
+impl Index<usize> for Bits {
     type Output = bool;
     fn index(&self, i: usize) -> &bool {
-        const TRUE: bool = true;
-        const FALSE: bool = false;
-        if self.0.test_bit(i) {
-            &TRUE
+        if *self & Self::single_bit(i) != Self::new() {
+            &true
         } else {
-            &FALSE
+            &false
         }
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct SetBits<B: BitsBase>(B);
-impl<B: BitsBase> SetBits<B> {
-    fn new(Bits(bits): Bits<B>) -> Self {
-        Self(bits)
+impl IntoIterator for Bits {
+    type IntoIter = IntoIter;
+    type Item = usize;
+    fn into_iter(self) -> IntoIter {
+        IntoIter { bits: self }
     }
 }
-impl<B: BitsBase> Iterator for SetBits<B> {
+#[derive(Debug, Clone, Copy)]
+pub struct IntoIter {
+    bits: Bits,
+}
+impl Iterator for IntoIter {
     type Item = usize;
     fn next(&mut self) -> Option<usize> {
         let min = (*self).min()?;
-        self.0 &= !(B::one() << min);
+        self.bits -= min;
         Some(min)
     }
     fn min(self) -> Option<usize> {
-        let tz = self.0.trailing_zeros();
-        if tz == B::SIZE {
+        let tz = self.bits.0.trailing_zeros() as usize;
+        if tz == Bits::CAPACITY {
             None
         } else {
             Some(tz)
         }
     }
     fn max(self) -> Option<usize> {
-        let lz = self.0.leading_zeros();
-        if lz == B::SIZE {
+        let lz = self.bits.0.leading_zeros() as usize;
+        if lz == Bits::CAPACITY {
             None
         } else {
-            Some(B::SIZE - lz - 1)
+            Some(Bits::CAPACITY - lz - 1)
         }
     }
 }
-impl<B: BitsBase> DoubleEndedIterator for SetBits<B> {
+impl DoubleEndedIterator for IntoIter {
     fn next_back(&mut self) -> Option<usize> {
         let max = (*self).max()?;
-        self.0 &= !(B::one() << max);
+        self.bits -= max;
         Some(max)
     }
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct SubBits<B: BitsBase> {
-    small: B,
-    large: B,
-    all: B,
+pub struct SubBits {
+    small: usize,
+    large: usize,
+    all: usize,
     finished: bool,
 }
-impl<B: BitsBase> SubBits<B> {
-    fn new(Bits(all): Bits<B>) -> Self {
+impl SubBits {
+    fn new(Bits(all): Bits) -> Self {
         SubBits {
-            small: B::zero(),
+            small: 0,
             large: all,
             all,
             finished: false,
         }
     }
 }
-impl<B: BitsBase> Iterator for SubBits<B> {
-    type Item = Bits<B>;
-    fn next(&mut self) -> Option<Bits<B>> {
+impl Iterator for SubBits {
+    type Item = Bits;
+    fn next(&mut self) -> Option<Bits> {
         if self.finished {
             None
         } else {
@@ -198,67 +241,16 @@ impl<B: BitsBase> Iterator for SubBits<B> {
         }
     }
 }
-impl<B: BitsBase> DoubleEndedIterator for SubBits<B> {
-    fn next_back(&mut self) -> Option<Bits<B>> {
+impl DoubleEndedIterator for SubBits {
+    fn next_back(&mut self) -> Option<Bits> {
         if self.finished {
             None
         } else {
             self.finished = self.small == self.large;
-            let mut ret = self.large.wrapping_sub(B::one()) & self.all;
+            let mut ret = self.large.wrapping_sub(1) & self.all;
             std::mem::swap(&mut self.large, &mut ret);
             Some(Bits(ret))
         }
-    }
-}
-
-pub trait BitsBase:
-    Copy
-    + Not<Output = Self>
-    + Shl<usize, Output = Self>
-    + Sub<Output = Self>
-    + From<bool>
-    + BitAnd<Output = Self>
-    + BitOr<Output = Self>
-    + BitXor<Output = Self>
-    + BitAndAssign
-    + BitOrAssign
-    + BitXorAssign
-    + Eq
-{
-    const SIZE: usize;
-    fn one() -> Self {
-        true.into()
-    }
-    fn zero() -> Self {
-        false.into()
-    }
-    fn test_bit(self, i: usize) -> bool {
-        (self & (Self::one() << i)) != Self::zero()
-    }
-    fn ones(len: usize) -> Self {
-        if len == Self::SIZE {
-            !Self::zero()
-        } else {
-            (Self::one() << len) - Self::one()
-        }
-    }
-    fn wrapping_sub(self, rhs: Self) -> Self;
-    fn trailing_zeros(self) -> usize;
-    fn leading_zeros(self) -> usize;
-}
-impl BitsBase for usize {
-    #[cfg(target_pointer_width = "32")]
-    const SIZE: usize = 32;
-    #[cfg(target_pointer_width = "64")]
-    const SIZE: usize = 64;
-    fn wrapping_sub(self, rhs: Self) -> Self {
-        self.wrapping_sub(rhs)
-    }
-    fn trailing_zeros(self) -> usize {
-        self.trailing_zeros() as usize
-    }
-    fn leading_zeros(self) -> usize {
-        self.leading_zeros() as usize
     }
 }
 
@@ -297,7 +289,7 @@ mod test {
     }
     #[test]
     fn test_set_bits() {
-        let mut iter = Bits(0b1011_1101).set_bits();
+        let mut iter = Bits(0b1011_1101).into_iter();
         // setbits = {0, 2, 3, 4, 5, 7}
         assert_eq!(iter.next(), Some(0));
         assert_eq!(iter.next(), Some(2));
