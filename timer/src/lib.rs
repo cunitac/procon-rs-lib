@@ -26,11 +26,12 @@ impl Timer {
             timer: self,
         }
     }
-    /// 現在から、「`begin` から `secs` 秒後」まで
-    pub fn subtimer(&self, secs: f64) -> Self {
+    /// 現在から、「`begin` から `ratio * duration` 秒後」まで
+    pub fn subtimer(&self, ratio: f64) -> Self {
+        assert!((0.0..=1.0).contains(&ratio));
         Self {
             begin: Instant::now(),
-            duration: Duration::from_secs_f64(secs) - self.elapsed_duration(),
+            duration: self.duration.mul_f64(ratio) - self.elapsed_duration(),
         }
     }
     pub fn subtimer_ratio(&self, ratio: f64) -> Self {

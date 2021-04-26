@@ -1,7 +1,4 @@
-use std::ops::{
-    Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Index, Not,
-    Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign,
-};
+use std::ops::*;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Bits(usize);
@@ -14,6 +11,12 @@ impl Bits {
 
     pub fn new() -> Self {
         Self(0)
+    }
+    pub fn len(self) -> usize {
+        self.0.count_ones() as usize
+    }
+    pub fn is_empty(self) -> bool {
+        self.0 == 0
     }
     pub fn filled(len: usize) -> Self {
         if len == Self::CAPACITY {
