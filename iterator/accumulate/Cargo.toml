@@ -1,5 +1,5 @@
 [package]
-name = "iterprod"
+name = "accumulate"
 version = "0.1.0"
 authors = ["cunitac <cunitac@gmail.com>"]
 edition = "2018"
