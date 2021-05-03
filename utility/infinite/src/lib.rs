@@ -1,7 +1,14 @@
-use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
-use MaybeInf::*;
+use {
+    std::{
+        fmt,
+        ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
+    },
+    MaybeInf::*,
+};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+/// 良い感じに加減乗算や比較ができる。
+/// 良い感じにできないときは panic する。
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum MaybeInf<T> {
     NegInf,
     Finite(T),
@@ -9,55 +16,27 @@ pub enum MaybeInf<T> {
 }
 
 impl<T> MaybeInf<T> {
-    /// `Finite` でなければパニック
+    /// `Finite` でなければ panic
     pub fn unwrap(self) -> T {
         match self {
             Finite(v) => v,
             _ => panic!("not finite"),
         }
     }
-    pub fn unwrap_or(self, when_posinf: impl FnOnce() -> T, when_neginf: impl FnOnce() -> T) -> T {
+}
+
+impl<T: fmt::Debug> fmt::Debug for MaybeInf<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Finite(v) => v,
-            PosInf => when_posinf(),
-            NegInf => when_neginf(),
+            Finite(v) => v.fmt(f),
+            PosInf => f.write_str("∞"),
+            NegInf => f.write_str("-∞"),
         }
-    }
-    pub fn unwrap_or_posinf(self, when_posinf: impl FnOnce() -> T) -> T {
-        self.unwrap_or(when_posinf, || panic!("neither Finite nor PosInf"))
-    }
-    pub fn unwrap_or_neginf(self, when_neginf: impl FnOnce() -> T) -> T {
-        self.unwrap_or(|| panic!("neither Finite nor NegInf"), when_neginf)
-    }
-    /// `PosInf` か `NegInf` なら変えない
-    pub fn map<U>(&self, f: impl FnOnce(&T) -> MaybeInf<U>) -> MaybeInf<U> {
-        match self {
-            Finite(v) => f(v),
-            PosInf => PosInf,
-            NegInf => NegInf,
-        }
-    }
-    pub fn map_or<U>(
-        &self,
-        when_posinf: impl FnOnce() -> U,
-        when_neginf: impl FnOnce() -> U,
-        f: impl FnOnce(&T) -> U,
-    ) -> U {
-        match self {
-            Finite(v) => f(v),
-            PosInf => when_posinf(),
-            NegInf => when_neginf(),
-        }
-    }
-    pub fn map_or_posinf<U>(&self, when_posinf: impl FnOnce() -> U, f: impl FnOnce(&T) -> U) -> U {
-        self.map_or(when_posinf, || panic!("neither Finite nor PosInf"), f)
-    }
-    pub fn map_or_neginf<U>(&self, when_neginf: impl FnOnce() -> U, f: impl FnOnce(&T) -> U) -> U {
-        self.map_or(|| panic!("neither Finite nor NegInf"), when_neginf, f)
     }
 }
 
 impl<T> From<MaybeInf<T>> for Option<T> {
+    /// `Finite` のときに `Some`
     fn from(v: MaybeInf<T>) -> Option<T> {
         match v {
             Finite(v) => Some(v),
@@ -85,6 +64,9 @@ impl<T: Neg> Neg for MaybeInf<T> {
 
 impl<T: Add<U>, U> Add<MaybeInf<U>> for MaybeInf<T> {
     type Output = MaybeInf<T::Output>;
+    /// # Panics
+    /// - `PosInf + NegInf`
+    /// - `NegInf + PosInf`
     fn add(self, rhs: MaybeInf<U>) -> Self::Output {
         match (self, rhs) {
             (Finite(a), Finite(b)) => Finite(a + b),
@@ -97,6 +79,9 @@ impl<T: Add<U>, U> Add<MaybeInf<U>> for MaybeInf<T> {
 }
 
 impl<T: AddAssign<U>, U> AddAssign<MaybeInf<U>> for MaybeInf<T> {
+    /// # Panics
+    /// - `PosInf += NegInf`
+    /// - `NegInf += PosInf`
     fn add_assign(&mut self, rhs: MaybeInf<U>) {
         if let Finite(a) = self {
             if let Finite(b) = rhs {
@@ -113,6 +98,9 @@ impl<T: AddAssign<U>, U> AddAssign<MaybeInf<U>> for MaybeInf<T> {
 
 impl<T: Sub<U>, U> Sub<MaybeInf<U>> for MaybeInf<T> {
     type Output = MaybeInf<T::Output>;
+    /// # Panics
+    /// - `PosInf - PosInf`
+    /// - `NegInf - NegInf`
     fn sub(self, rhs: MaybeInf<U>) -> Self::Output {
         match (self, rhs) {
             (Finite(a), Finite(b)) => Finite(a - b),
@@ -125,6 +113,9 @@ impl<T: Sub<U>, U> Sub<MaybeInf<U>> for MaybeInf<T> {
 }
 
 impl<T: SubAssign<U>, U> SubAssign<MaybeInf<U>> for MaybeInf<T> {
+    /// # Panics
+    /// - `PosInf -= PosInf`
+    /// - `NegInf -= NegInf`
     fn sub_assign(&mut self, rhs: MaybeInf<U>) {
         if let Finite(a) = self {
             if let Finite(b) = rhs {
@@ -141,6 +132,11 @@ impl<T: SubAssign<U>, U> SubAssign<MaybeInf<U>> for MaybeInf<T> {
 
 impl<T: Mul<U> + Signed, U: Signed> Mul<MaybeInf<U>> for MaybeInf<T> {
     type Output = MaybeInf<T::Output>;
+    /// # Panics
+    /// - `Zero * PosInf`
+    /// - `Zero * NegInf`
+    /// - `PosInf * Zero`
+    /// - `NegInf * Zero`
     fn mul(self, rhs: MaybeInf<U>) -> Self::Output {
         use Signum::*;
         match (self, rhs) {
@@ -172,6 +168,11 @@ impl<T: Mul<U> + Signed, U: Signed> Mul<MaybeInf<U>> for MaybeInf<T> {
 }
 
 impl<T: MulAssign<U> + Signed, U: Signed> MulAssign<MaybeInf<U>> for MaybeInf<T> {
+    /// # Panics
+    /// - `Zero *= PosInf`
+    /// - `Zero *= NegInf`
+    /// - `PosInf *= Zero`
+    /// - `NegInf *= Zero`
     fn mul_assign(&mut self, rhs: MaybeInf<U>) {
         use Signum::*;
         match self {
@@ -252,4 +253,56 @@ macro_rules! impl_zero {
 impl_zero!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize, f32, f64);
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::MaybeInf::*;
+    #[test]
+    fn test_unwrap() {
+        assert_eq!(Finite(1).unwrap(), 1);
+    }
+    #[test]
+    #[should_panic]
+    fn test_unwrap_panic_0() {
+        let _ = PosInf::<i32>.unwrap();
+    }
+    #[test]
+    fn test_debug() {
+        assert_eq!(format!("{:?}", Finite(42)), "42");
+        assert_eq!(format!("{:?}", PosInf::<i32>), "∞");
+        assert_eq!(format!("{:?}", NegInf::<i32>), "-∞");
+    }
+    #[test]
+    #[should_panic]
+    fn test_unwrap_panic_1() {
+        let _ = NegInf::<i32>.unwrap();
+    }
+    #[test]
+    fn test_add() {
+        assert_eq!(Finite(1) + Finite(2), Finite(3));
+        assert_eq!(Finite(1) + PosInf::<i32>, PosInf);
+        assert_eq!(PosInf::<i32> + Finite(1), PosInf);
+        assert_eq!(PosInf::<i32> + PosInf::<i32>, PosInf);
+        assert_eq!(Finite(1) + NegInf::<i32>, NegInf);
+        assert_eq!(NegInf::<i32> + Finite(1), NegInf);
+        assert_eq!(NegInf::<i32> + NegInf::<i32>, NegInf);
+    }
+    #[test]
+    #[should_panic]
+    fn test_add_panic_0() {
+        let _ = PosInf::<i32> + NegInf::<i32>;
+    }
+    #[test]
+    #[should_panic]
+    fn test_add_panic_1() {
+        let _ = NegInf::<i32> + PosInf::<i32>;
+    }
+    #[test]
+    fn test_sub() {
+        assert_eq!(Finite(1) - Finite(2), Finite(-1));
+        assert_eq!(Finite(1) - PosInf::<i32>, NegInf);
+        assert_eq!(PosInf::<i32> - Finite(1), PosInf);
+        assert_eq!(PosInf::<i32> - NegInf::<i32>, PosInf);
+        assert_eq!(Finite(1) - NegInf::<i32>, PosInf);
+        assert_eq!(NegInf::<i32> - Finite(1), NegInf);
+        assert_eq!(NegInf::<i32> - PosInf::<i32>, NegInf);
+    }
+}
