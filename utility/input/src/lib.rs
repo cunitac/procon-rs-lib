@@ -11,33 +11,42 @@ thread_local!(
 
 #[macro_export]
 macro_rules! read {
-    (from $source:expr, [$type:tt; $len:expr]) => {
-        (0..$len).map(|_| $crate::read!(from $source, $type)).collect::<Vec<_>>()
+    ($($arg:tt)*) => {
+        $crate::try_read!($($arg)*).unwrap()
     };
-    (from $source:expr, [$type:tt]) => {{
-        let len = $crate::read!(from $source, usize);
-        $crate::read!(from $source, [$type; len])
-    }};
+}
+
+#[macro_export]
+macro_rules! try_read {
+    (from $source:expr, [$type:tt; $len:expr]) => {
+        (0..$len)
+            .map(|_| $crate::try_read!(from $source, $type))
+            .collect::<::std::option::Option<::std::vec::Vec<_>>>()
+    };
+    (from $source:expr, [$type:tt]) => {
+        $crate::try_read!(from $source, usize)
+            .and_then(|len| $crate::try_read!(from $source, [$type; len]))
+    };
     (from $source:expr, ($($type:tt),* $(,)?)) => {
-        ($($crate::read!(from $source, $type)),*)
+        $crate::try_read!(from $source, $($type),*)
     };
     (from $source:expr, $type:ty) => {
-        $source.read::<$type>().unwrap()
+        <$type as $crate::FromSource>::from_source(&mut $source)
     };
     (from $source:expr, $($type:tt),* $(,)?) => {
-        ($($crate::read!(from $source, $type)),*)
+        (|| Some(($($crate::try_read!(from $source, $type)?),*)))()
     };
     ($($rest:tt)*) => {
-        $crate::STDIN_SOURCE.with(|stdin| $crate::read!(from stdin.borrow_mut(), $($rest)*))
+        $crate::STDIN_SOURCE.with(|stdin| $crate::try_read!(from stdin.borrow_mut(), $($rest)*))
     };
 }
 
 #[macro_export]
 macro_rules! input {
-    (from $source:expr, $($name:ident: $type:tt),* $(,)?) => {
+    (from $source:expr, $($name:tt: $type:tt),* $(,)?) => {
         $(let $name = $crate::read!(from $source, $type);)*
     };
-    ($($name:ident: $type:tt),* $(,)?) => {
+    ($($name:tt: $type:tt),* $(,)?) => {
         $(let $name = $crate::read!($type);)*
     };
 }
@@ -61,10 +70,6 @@ impl<R: Read> Source<R> {
             self.tokens.next()
         })
     }
-    /// `next_token` が `None` のときに限って `None`
-    pub fn read<T: FromStr>(&mut self) -> Option<T> {
-        Some(self.next_token()?.parse().ok().expect("failed to parse"))
-    }
     /// まだ `next_token` 等で読み出していない入力は破棄される
     pub fn load(&mut self) {
         let mut input = String::new();
@@ -80,5 +85,78 @@ impl<R: Read> Source<R> {
     }
 }
 
+pub trait FromSource {
+    type Output;
+    /// 読んでいる途中に `next_token` が `None` になった場合に限って `None` を返す
+    fn from_source<R: Read>(source: &mut Source<R>) -> Option<Self::Output>;
+}
+
+impl<T: FromStr> FromSource for T {
+    type Output = T;
+    fn from_source<R: Read>(source: &mut Source<R>) -> Option<T> {
+        Some(source.next_token()?.parse().ok().expect("failed to parse"))
+    }
+}
+
+pub mod marker {
+    use {
+        super::{FromSource, Source},
+        std::io::Read,
+    };
+    macro_rules! marker {
+        ($name:ident, $output:ty, |$source:ident| $read:expr) => {
+            pub enum $name {}
+            impl FromSource for $name {
+                type Output = $output;
+                #[allow(unused_mut)]
+                fn from_source<R: Read>(mut $source: &mut Source<R>) -> Option<$output> {
+                    Some($read)
+                }
+            }
+        };
+    }
+    marker!(Byte, u8, |s| try_read!(from s, char)? as u8);
+    marker!(Bytes, Vec<u8>, |s| s.next_token()?.bytes().collect());
+    marker!(Chars, Vec<char>, |s| s.next_token()?.chars().collect());
+    marker!(Usize1, usize, |s| try_read!(from s, usize)? - 1);
+    marker!(Isize1, isize, |s| try_read!(from s, isize)? - 1);
+}
+
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test() {
+        let source = "
+            42
+            4.2 四二
+            3 1 2 3
+            b bytes chars 1 -5
+            3 3 2 1
+            try
+        ";
+        let mut source = Source::new(source.as_bytes());
+
+        assert_eq!(read!(from source, usize), 42);
+        assert_eq!(read!(from source, f64, String), (4.2, String::from("四二")));
+        assert_eq!(read!(from source, [u32]), vec![1, 2, 3]);
+
+        use super::marker::*;
+        input!(
+            from source,
+            (byte, (bytes, (chars, usize1,)), isize1): (Byte, (Bytes, (Chars, Usize1),), Isize1),
+            n: usize,
+            a: [i32; n],
+        );
+        assert_eq!(byte, b'b');
+        assert_eq!(bytes, b"bytes");
+        assert_eq!(chars, vec!['c', 'h', 'a', 'r', 's']);
+        assert_eq!(usize1, 0);
+        assert_eq!(isize1, -6);
+        assert_eq!(a, vec![3, 2, 1]);
+
+        assert_eq!(try_read!(from source, String), Some(String::from("try")));
+        assert_eq!(try_read!(from source, String), None);
+    }
+}
