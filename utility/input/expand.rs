@@ -29,11 +29,6 @@ pub const STDIN_SOURCE: ::std::thread::LocalKey<RefCell<Source<Stdin>>> = {
     }
     unsafe { ::std::thread::LocalKey::new(__getit) }
 };
-fn test() {
-    let a = crate::STDIN_SOURCE
-        .with(|stdin| <u32 as crate::FromSource>::from_source(&mut stdin.borrow_mut()).unwrap())
-        .unwrap();
-}
 pub struct Source<R> {
     tokens: SplitWhitespace<'static>,
     source: R,
@@ -79,10 +74,276 @@ impl<T: FromStr> FromSource for T {
         Some(source.next_token()?.parse().ok().expect("failed to parse"))
     }
 }
-mod marker {
+pub mod marker {
+    use {
+        super::{FromSource, Source},
+        std::io::Read,
+    };
     pub enum Byte {}
+    impl FromSource for Byte {
+        type Output = u8;
+        #[allow(unused_mut)]
+        fn from_source<R: Read>(mut s: &mut Source<R>) -> Option<u8> {
+            Some(<char as crate::FromSource>::from_source(&mut s)? as u8)
+        }
+    }
     pub enum Bytes {}
+    impl FromSource for Bytes {
+        type Output = Vec<u8>;
+        #[allow(unused_mut)]
+        fn from_source<R: Read>(mut s: &mut Source<R>) -> Option<Vec<u8>> {
+            Some(s.next_token()?.bytes().collect())
+        }
+    }
+    pub enum Chars {}
+    impl FromSource for Chars {
+        type Output = Vec<char>;
+        #[allow(unused_mut)]
+        fn from_source<R: Read>(mut s: &mut Source<R>) -> Option<Vec<char>> {
+            Some(s.next_token()?.chars().collect())
+        }
+    }
     pub enum Usize1 {}
+    impl FromSource for Usize1 {
+        type Output = usize;
+        #[allow(unused_mut)]
+        fn from_source<R: Read>(mut s: &mut Source<R>) -> Option<usize> {
+            Some(<usize as crate::FromSource>::from_source(&mut s)? - 1)
+        }
+    }
     pub enum Isize1 {}
+    impl FromSource for Isize1 {
+        type Output = isize;
+        #[allow(unused_mut)]
+        fn from_source<R: Read>(mut s: &mut Source<R>) -> Option<isize> {
+            Some(<isize as crate::FromSource>::from_source(&mut s)? - 1)
+        }
+    }
 }
-mod tests {}
+fn test() {
+    let source = "
+        42
+        4.2 四二
+        3 1 2 3
+        b bytes chars 1 -5
+        3 3 2 1
+        try
+    ";
+    let mut source = Source::new(source.as_bytes());
+    {
+        match (
+            &<usize as crate::FromSource>::from_source(&mut source).unwrap(),
+            &42,
+        ) {
+            (left_val, right_val) => {
+                if !(*left_val == *right_val) {
+                    let kind = ::core::panicking::AssertKind::Eq;
+                    ::core::panicking::assert_failed(
+                        kind,
+                        &*left_val,
+                        &*right_val,
+                        ::core::option::Option::None,
+                    );
+                }
+            }
+        }
+    };
+    {
+        match (
+            &(|| {
+                Some((
+                    <f64 as crate::FromSource>::from_source(&mut source)?,
+                    <String as crate::FromSource>::from_source(&mut source)?,
+                ))
+            })()
+            .unwrap(),
+            &(4.2, String::from("四二")),
+        ) {
+            (left_val, right_val) => {
+                if !(*left_val == *right_val) {
+                    let kind = ::core::panicking::AssertKind::Eq;
+                    ::core::panicking::assert_failed(
+                        kind,
+                        &*left_val,
+                        &*right_val,
+                        ::core::option::Option::None,
+                    );
+                }
+            }
+        }
+    };
+    {
+        match (
+            &<usize as crate::FromSource>::from_source(&mut source)
+                .and_then(|len| {
+                    (0..len)
+                        .map(|_| <u32 as crate::FromSource>::from_source(&mut source))
+                        .collect::<::std::option::Option<::std::vec::Vec<_>>>()
+                })
+                .unwrap(),
+            &<[_]>::into_vec(box [1, 2, 3]),
+        ) {
+            (left_val, right_val) => {
+                if !(*left_val == *right_val) {
+                    let kind = ::core::panicking::AssertKind::Eq;
+                    ::core::panicking::assert_failed(
+                        kind,
+                        &*left_val,
+                        &*right_val,
+                        ::core::option::Option::None,
+                    );
+                }
+            }
+        }
+    };
+    use marker::*;
+    let (byte, (bytes, (chars, usize1)), isize1) = (|| {
+        Some((
+            <Byte as crate::FromSource>::from_source(&mut source)?,
+            (|| {
+                Some((
+                    <Bytes as crate::FromSource>::from_source(&mut source)?,
+                    (|| {
+                        Some((
+                            <Chars as crate::FromSource>::from_source(&mut source)?,
+                            <Usize1 as crate::FromSource>::from_source(&mut source)?,
+                        ))
+                    })()?,
+                ))
+            })()?,
+            <Isize1 as crate::FromSource>::from_source(&mut source)?,
+        ))
+    })()
+    .unwrap();
+    let n = <usize as crate::FromSource>::from_source(&mut source).unwrap();
+    let a = (0..n)
+        .map(|_| <i32 as crate::FromSource>::from_source(&mut source))
+        .collect::<::std::option::Option<::std::vec::Vec<_>>>()
+        .unwrap();
+    {
+        match (&byte, &b'b') {
+            (left_val, right_val) => {
+                if !(*left_val == *right_val) {
+                    let kind = ::core::panicking::AssertKind::Eq;
+                    ::core::panicking::assert_failed(
+                        kind,
+                        &*left_val,
+                        &*right_val,
+                        ::core::option::Option::None,
+                    );
+                }
+            }
+        }
+    };
+    {
+        match (&bytes, &b"bytes") {
+            (left_val, right_val) => {
+                if !(*left_val == *right_val) {
+                    let kind = ::core::panicking::AssertKind::Eq;
+                    ::core::panicking::assert_failed(
+                        kind,
+                        &*left_val,
+                        &*right_val,
+                        ::core::option::Option::None,
+                    );
+                }
+            }
+        }
+    };
+    {
+        match (&chars, &<[_]>::into_vec(box ['c', 'h', 'a', 'r', 's'])) {
+            (left_val, right_val) => {
+                if !(*left_val == *right_val) {
+                    let kind = ::core::panicking::AssertKind::Eq;
+                    ::core::panicking::assert_failed(
+                        kind,
+                        &*left_val,
+                        &*right_val,
+                        ::core::option::Option::None,
+                    );
+                }
+            }
+        }
+    };
+    {
+        match (&usize1, &0) {
+            (left_val, right_val) => {
+                if !(*left_val == *right_val) {
+                    let kind = ::core::panicking::AssertKind::Eq;
+                    ::core::panicking::assert_failed(
+                        kind,
+                        &*left_val,
+                        &*right_val,
+                        ::core::option::Option::None,
+                    );
+                }
+            }
+        }
+    };
+    {
+        match (&isize1, &-6) {
+            (left_val, right_val) => {
+                if !(*left_val == *right_val) {
+                    let kind = ::core::panicking::AssertKind::Eq;
+                    ::core::panicking::assert_failed(
+                        kind,
+                        &*left_val,
+                        &*right_val,
+                        ::core::option::Option::None,
+                    );
+                }
+            }
+        }
+    };
+    {
+        match (&a, &<[_]>::into_vec(box [3, 2, 1])) {
+            (left_val, right_val) => {
+                if !(*left_val == *right_val) {
+                    let kind = ::core::panicking::AssertKind::Eq;
+                    ::core::panicking::assert_failed(
+                        kind,
+                        &*left_val,
+                        &*right_val,
+                        ::core::option::Option::None,
+                    );
+                }
+            }
+        }
+    };
+    {
+        match (
+            &<String as crate::FromSource>::from_source(&mut source),
+            &Some(String::from("try")),
+        ) {
+            (left_val, right_val) => {
+                if !(*left_val == *right_val) {
+                    let kind = ::core::panicking::AssertKind::Eq;
+                    ::core::panicking::assert_failed(
+                        kind,
+                        &*left_val,
+                        &*right_val,
+                        ::core::option::Option::None,
+                    );
+                }
+            }
+        }
+    };
+    {
+        match (
+            &<String as crate::FromSource>::from_source(&mut source),
+            &None,
+        ) {
+            (left_val, right_val) => {
+                if !(*left_val == *right_val) {
+                    let kind = ::core::panicking::AssertKind::Eq;
+                    ::core::panicking::assert_failed(
+                        kind,
+                        &*left_val,
+                        &*right_val,
+                        ::core::option::Option::None,
+                    );
+                }
+            }
+        }
+    };
+}
