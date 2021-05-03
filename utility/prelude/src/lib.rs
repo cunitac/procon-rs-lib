@@ -1,5 +1,5 @@
 pub use {
-    input::input,
+    input::{input, marker::*},
     std::{
         cmp::{self, Ordering, Reverse},
         collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque},
