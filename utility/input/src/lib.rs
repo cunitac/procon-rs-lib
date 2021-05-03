@@ -37,7 +37,10 @@ macro_rules! try_read {
         (|| Some(($($crate::try_read!(from $source, $type)?),*)))()
     };
     ($($rest:tt)*) => {
-        $crate::STDIN_SOURCE.with(|stdin| $crate::try_read!(from stdin.borrow_mut(), $($rest)*))
+        $crate::STDIN_SOURCE.with(|stdin| {
+            let mut source = stdin.borrow_mut();
+            $crate::try_read!(from source, $($rest)*)
+        })
     };
 }
 
