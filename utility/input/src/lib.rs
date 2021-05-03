@@ -10,27 +10,36 @@ thread_local!(
 );
 
 #[macro_export]
-macro_rules! input {
+macro_rules! read {
     (from $source:expr, [$type:tt; $len:expr]) => {
-        (0..$len).map(|_| $crate::input!(from $source, $type)).collect::<Vec<_>>()
+        (0..$len).map(|_| $crate::read!(from $source, $type)).collect::<Vec<_>>()
     };
     (from $source:expr, [$type:tt]) => {{
-        let len = $crate::input!(from $source, usize);
-        $crate::input!(from $source, [$type; len])
+        let len = $crate::read!(from $source, usize);
+        $crate::read!(from $source, [$type; len])
     }};
     (from $source:expr, ($($type:tt),* $(,)?)) => {
-        ($($crate::input!(from $source, $type)),*)
+        ($($crate::read!(from $source, $type)),*)
     };
     (from $source:expr, $type:ty) => {
         $source.read::<$type>().unwrap()
     };
     (from $source:expr, $($type:tt),* $(,)?) => {
-        ($($crate::input!(from $source, $type)),*)
+        ($($crate::read!(from $source, $type)),*)
     };
     ($($rest:tt)*) => {
-        $crate::STDIN_SOURCE.with(|stdin| $crate::input!(from stdin.borrow_mut(), $($rest)*))
+        $crate::STDIN_SOURCE.with(|stdin| $crate::read!(from stdin.borrow_mut(), $($rest)*))
     };
+}
 
+#[macro_export]
+macro_rules! input {
+    (from $source:expr, $($name:ident: $type:tt),* $(,)?) => {
+        $(let $name = $crate::read!(from $source, $type);)*
+    };
+    ($($name:ident: $type:tt),* $(,)?) => {
+        $(let $name = $crate::read!($type);)*
+    };
 }
 
 pub struct Source<R> {
