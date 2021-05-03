@@ -141,28 +141,26 @@ impl<T: Mul<U> + Signed, U: Signed> Mul<MaybeInf<U>> for MaybeInf<T> {
         use Signum::*;
         match (self, rhs) {
             (Finite(a), Finite(b)) => Finite(a * b),
-            (PosInf, Finite(b)) => match b.signum() {
+            (PosInf, b) => match b.signum() {
                 Positive => PosInf,
                 Zero => panic!("PosInf * Zero"),
                 Negative => NegInf,
             },
-            (NegInf, Finite(b)) => match b.signum() {
+            (NegInf, b) => match b.signum() {
                 Positive => NegInf,
                 Zero => panic!("NegInf * Zero"),
                 Negative => PosInf,
             },
-            (Finite(a), PosInf) => match a.signum() {
+            (a, PosInf) => match a.signum() {
                 Positive => PosInf,
                 Zero => panic!("Zero * PosInf"),
                 Negative => NegInf,
             },
-            (Finite(a), NegInf) => match a.signum() {
+            (a, NegInf) => match a.signum() {
                 Positive => NegInf,
                 Zero => panic!("Zero * NegInf"),
                 Negative => PosInf,
             },
-            (PosInf, PosInf) | (NegInf, NegInf) => PosInf,
-            (PosInf, NegInf) | (NegInf, PosInf) => NegInf,
         }
     }
 }
@@ -304,5 +302,53 @@ mod tests {
         assert_eq!(Finite(1) - NegInf::<i32>, PosInf);
         assert_eq!(NegInf::<i32> - Finite(1), NegInf);
         assert_eq!(NegInf::<i32> - PosInf::<i32>, NegInf);
+    }
+    #[test]
+    #[should_panic]
+    #[allow(clippy::eq_op)]
+    fn test_sub_panic_0() {
+        let _ = PosInf::<i32> - PosInf::<i32>;
+    }
+    #[test]
+    #[should_panic]
+    #[allow(clippy::eq_op)]
+    fn test_sub_panic_1() {
+        let _ = NegInf::<i32> - NegInf::<i32>;
+    }
+    #[test]
+    fn test_mul() {
+        assert_eq!(Finite(1) * Finite(2), Finite(2));
+        assert_eq!(Finite(1) * PosInf::<i32>, PosInf);
+        assert_eq!(Finite(-1) * PosInf::<i32>, NegInf);
+        assert_eq!(PosInf::<i32> * Finite(1), PosInf);
+        assert_eq!(PosInf::<i32> * Finite(-1), NegInf);
+        assert_eq!(PosInf::<i32> * PosInf::<i32>, PosInf);
+        assert_eq!(PosInf::<i32> * NegInf::<i32>, NegInf);
+        assert_eq!(Finite(1) * NegInf::<i32>, NegInf);
+        assert_eq!(Finite(-1) * NegInf::<i32>, PosInf);
+        assert_eq!(NegInf::<i32> * Finite(1), NegInf);
+        assert_eq!(NegInf::<i32> * Finite(-1), PosInf);
+        assert_eq!(NegInf::<i32> * PosInf::<i32>, NegInf);
+        assert_eq!(NegInf::<i32> * NegInf::<i32>, PosInf);
+    }
+    #[test]
+    #[should_panic]
+    fn test_mul_panic_0() {
+        let _ = Finite(0) * PosInf::<i32>;
+    }
+    #[test]
+    #[should_panic]
+    fn test_mul_panic_1() {
+        let _ = Finite(0) * NegInf::<i32>;
+    }
+    #[test]
+    #[should_panic]
+    fn test_mul_panic_2() {
+        let _ = PosInf::<i32> * Finite(0);
+    }
+    #[test]
+    #[should_panic]
+    fn test_mul_panic_3() {
+        let _ = NegInf::<i32> * Finite(0);
     }
 }
