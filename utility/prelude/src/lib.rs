@@ -1,5 +1,5 @@
 pub use {
-    easyio::prelude::*,
+    input::input,
     std::{
         cmp::{self, Ordering, Reverse},
         collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque},
