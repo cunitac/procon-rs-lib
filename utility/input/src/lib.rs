@@ -1,19 +1,36 @@
 use std::{
-    io::Read,
-    iter::FromIterator,
-    marker::PhantomData,
+    cell::RefCell,
+    io::{Read, Stdin},
     str::{FromStr, SplitWhitespace},
 };
 
-pub trait Reader<T> {
-    fn next(&mut self) -> T;
-    fn collect(&mut self, len: usize) -> Collect<Self, T> {
-        Collect {
-            source: self,
-            len,
-            _phantom: PhantomData,
-        }
-    }
+thread_local!(
+    #[doc(hidden)]
+    pub static STDIN_SOURCE: RefCell<Source<Stdin>> = RefCell::new(Source::new(std::io::stdin()));
+);
+
+#[macro_export]
+macro_rules! input {
+    (from $source:expr, [$type:tt; $len:expr]) => {
+        (0..$len).map(|_| $crate::input!(from $source, $type)).collect::<Vec<_>>()
+    };
+    (from $source:expr, [$type:tt]) => {{
+        let len = $crate::input!(from $source, usize);
+        $crate::input!(from $source, [$type; len])
+    }};
+    (from $source:expr, ($($type:tt),* $(,)?)) => {
+        ($($crate::input!(from $source, $type)),*)
+    };
+    (from $source:expr, $type:ty) => {
+        $source.read::<$type>().unwrap()
+    };
+    (from $source:expr, $($type:tt),* $(,)?) => {
+        ($($crate::input!(from $source, $type)),*)
+    };
+    ($($rest:tt)*) => {
+        $crate::STDIN_SOURCE.with(|stdin| $crate::input!(from stdin.borrow_mut(), $($rest)*))
+    };
+
 }
 
 pub struct Source<R> {
@@ -28,44 +45,31 @@ impl<R: Read> Source<R> {
             source,
         }
     }
+    /// バッファが空なら一度 `load` して再度試す
     pub fn next_token(&mut self) -> Option<&str> {
         self.tokens.next().or_else(|| {
             self.load();
             self.tokens.next()
         })
     }
+    /// `next_token` が `None` のときに限って `None`
+    pub fn read<T: FromStr>(&mut self) -> Option<T> {
+        Some(self.next_token()?.parse().ok().expect("failed to parse"))
+    }
+    /// まだ `next_token` 等で読み出していない入力は破棄される
     pub fn load(&mut self) {
         let mut input = String::new();
         self.source.read_to_string(&mut input).unwrap();
         self.tokens = Box::leak(input.into_boxed_str()).split_whitespace();
     }
-}
-
-impl<R: Read, T: FromStr> Reader<T> for Source<R> {
-    fn next(&mut self) -> T {
-        self.next_token().unwrap().parse().ok().unwrap()
+    /// バッファが空でなければ panic
+    /// `load` して試すことはない
+    pub fn finish(&mut self) {
+        if self.tokens.next().is_some() {
+            panic!("not finished")
+        }
     }
 }
 
-pub struct Collect<'a, R: ?Sized, T> {
-    source: &'a mut R,
-    len: usize,
-    _phantom: PhantomData<T>,
-}
-
-impl<T, R: Reader<T>, A: FromIterator<T>> Reader<A> for Collect<'_, R, T> {
-    fn next(&mut self) -> A {
-        (0..self.len).map(|_| self.source.next()).collect()
-    }
-}
-
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_collect() {
-        let mut src = Source::new(&b" 1 2 3 4 5 6"[..]);
-        let v: Vec<Vec<u32>> = src.collect(3).collect(2).next();
-        assert_eq!(v, vec![vec![1, 2, 3], vec![4, 5, 6]]);
-    }
-}
+#[cfg(test)]
+mod tests {}
