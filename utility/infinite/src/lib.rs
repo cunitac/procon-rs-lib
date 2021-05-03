@@ -351,4 +351,17 @@ mod tests {
     fn test_mul_panic_3() {
         let _ = NegInf::<i32> * Finite(0);
     }
+    #[test]
+    fn test_neg() {
+        assert_eq!(-Finite(1), Finite(-1));
+        assert_eq!(-PosInf::<i32>, NegInf);
+        assert_eq!(-NegInf::<i32>, PosInf);
+    }
+    #[test]
+    fn test_ord() {
+        assert!(NegInf < Finite(i32::min_value()));
+        assert!(Finite(i32::min_value()) < Finite(i32::max_value()));
+        assert!(Finite(i32::max_value()) < PosInf);
+        assert!(NegInf::<i32> < PosInf::<i32>);
+    }
 }
