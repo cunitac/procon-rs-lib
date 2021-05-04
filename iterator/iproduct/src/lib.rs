@@ -35,31 +35,34 @@ macro_rules! iproduct {
     };
 }
 
-#[test]
-fn test() {
-    let iter = iproduct!(0..4);
-    assert_eq!(iter.collect::<Vec<(i32,)>>(), vec![(0,), (1,), (2,), (3,)],);
-    let iter = iproduct!(0..3, 0..2);
-    assert_eq!(
-        iter.collect::<Vec<(i32, i32)>>(),
-        vec![(0, 0), (0, 1), (1, 0), (1, 1), (2, 0), (2, 1)]
-    );
-    let iter = iproduct!(0..2, 0..2, 0..2);
-    assert_eq!(
-        iter.collect::<Vec<(i32, i32, i32)>>(),
-        vec![
-            (0, 0, 0),
-            (0, 0, 1),
-            (0, 1, 0),
-            (0, 1, 1),
-            (1, 0, 0),
-            (1, 0, 1),
-            (1, 1, 0),
-            (1, 1, 1)
-        ]
-    );
-    let iter = iproduct!("ab".chars(), "xyz".chars());
-    assert!(iter
-        .map(|(a, b)| format!("{}{}", a, b))
-        .eq(["ax", "ay", "az", "bx", "by", "bz"].iter().copied()));
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test() {
+        let iter = iproduct!(0..4);
+        assert_eq!(iter.collect::<Vec<(i32,)>>(), vec![(0,), (1,), (2,), (3,)],);
+        let iter = iproduct!(0..3, 0..2);
+        assert_eq!(
+            iter.collect::<Vec<(i32, i32)>>(),
+            vec![(0, 0), (0, 1), (1, 0), (1, 1), (2, 0), (2, 1)]
+        );
+        let iter = iproduct!(0..2, 0..2, 0..2);
+        assert_eq!(
+            iter.collect::<Vec<(i32, i32, i32)>>(),
+            vec![
+                (0, 0, 0),
+                (0, 0, 1),
+                (0, 1, 0),
+                (0, 1, 1),
+                (1, 0, 0),
+                (1, 0, 1),
+                (1, 1, 0),
+                (1, 1, 1)
+            ]
+        );
+        let iter = iproduct!("ab".chars(), "xyz".chars());
+        assert!(iter
+            .map(|(a, b)| format!("{}{}", a, b))
+            .eq(["ax", "ay", "az", "bx", "by", "bz"].iter().copied()));
+    }
 }
