@@ -85,7 +85,7 @@ impl<R: BufRead> Source<R> {
     /// まだ `next_token` 等で読み出していない入力は破棄される
     pub fn load(&mut self) {
         let mut input = String::new();
-        while self.source.read_line(&mut input).unwrap() > 0 {}
+        self.source.read_line(&mut input).unwrap();
         self.tokens = Box::leak(input.into_boxed_str()).split_whitespace();
     }
     /// バッファが空でなければ panic
