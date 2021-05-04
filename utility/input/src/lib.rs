@@ -1,12 +1,13 @@
 use std::{
     cell::RefCell,
-    io::{Read, Stdin},
+    io::{BufRead, BufReader, Stdin},
     str::{FromStr, SplitWhitespace},
 };
 
 thread_local!(
     #[doc(hidden)]
-    pub static STDIN_SOURCE: RefCell<Source<Stdin>> = RefCell::new(Source::new(std::io::stdin()));
+    pub static STDIN_SOURCE: RefCell<Source<BufReader<Stdin>>> =
+        RefCell::new(Source::new(BufReader::new(std::io::stdin())));
 );
 
 #[macro_export]
@@ -67,7 +68,7 @@ pub struct Source<R> {
     source: R,
 }
 
-impl<R: Read> Source<R> {
+impl<R: BufRead> Source<R> {
     pub fn new(source: R) -> Self {
         Self {
             tokens: "".split_whitespace(),
@@ -84,7 +85,7 @@ impl<R: Read> Source<R> {
     /// まだ `next_token` 等で読み出していない入力は破棄される
     pub fn load(&mut self) {
         let mut input = String::new();
-        self.source.read_to_string(&mut input).unwrap();
+        while self.source.read_line(&mut input).unwrap() > 0 {}
         self.tokens = Box::leak(input.into_boxed_str()).split_whitespace();
     }
     /// バッファが空でなければ panic
@@ -99,12 +100,12 @@ impl<R: Read> Source<R> {
 pub trait FromSource {
     type Output;
     /// 読んでいる途中に `next_token` が `None` になった場合に限って `None` を返す
-    fn from_source<R: Read>(source: &mut Source<R>) -> Option<Self::Output>;
+    fn from_source<R: BufRead>(source: &mut Source<R>) -> Option<Self::Output>;
 }
 
 impl<T: FromStr> FromSource for T {
     type Output = T;
-    fn from_source<R: Read>(source: &mut Source<R>) -> Option<T> {
+    fn from_source<R: BufRead>(source: &mut Source<R>) -> Option<T> {
         Some(source.next_token()?.parse().ok().expect("failed to parse"))
     }
 }
@@ -112,7 +113,7 @@ impl<T: FromStr> FromSource for T {
 pub mod marker {
     use {
         super::{FromSource, Source},
-        std::io::Read,
+        std::io::BufRead,
     };
     macro_rules! marker {
         ($name:ident, $output:ty, |$source:ident| $read:expr) => {
@@ -120,7 +121,7 @@ pub mod marker {
             impl FromSource for $name {
                 type Output = $output;
                 #[allow(unused_mut)]
-                fn from_source<R: Read>(mut $source: &mut Source<R>) -> Option<$output> {
+                fn from_source<R: BufRead>(mut $source: &mut Source<R>) -> Option<$output> {
                     Some($read)
                 }
             }
