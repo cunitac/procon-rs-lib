@@ -49,7 +49,7 @@ thread_local!(
     #[cfg(debug_assertions)]
     #[doc(hidden)]
     pub static STDIN_SOURCE: RefCell<Source<LineRead<io::BufReader<Stdin>>>> =
-        RefCell::new(Source::new(LineRead(io::BufReader::new(std::io::stdin()))));
+        RefCell::new(Source::interactive_stdin());
 );
 
 /// 入力がない場合は panic
@@ -114,22 +114,6 @@ impl<R: io::Read> Read for R {
     }
 }
 
-/// おもにインタラクティブのために
-/// ```no_run
-/// use input::{input, LineRead, Source};
-///
-/// let stdin = std::io::stdin();
-/// let mut source = Source::new(LineRead(stdin.lock()));
-///
-/// input!(from source, a: u32);
-/// ```
-pub struct LineRead<R>(pub R);
-impl<R: io::BufRead> Read for LineRead<R> {
-    fn read_to_string(&mut self, buf: &mut String) -> io::Result<usize> {
-        self.0.read_line(buf)
-    }
-}
-
 pub struct Source<R: Read> {
     tokens: SplitWhitespace<'static>,
     source: R,
@@ -161,6 +145,18 @@ impl<R: Read> Source<R> {
         if self.tokens.next().is_some() {
             panic!("not finished")
         }
+    }
+}
+
+pub struct LineRead<R>(pub R);
+impl<R: io::BufRead> Read for LineRead<R> {
+    fn read_to_string(&mut self, buf: &mut String) -> io::Result<usize> {
+        self.0.read_line(buf)
+    }
+}
+impl Source<LineRead<io::BufReader<Stdin>>> {
+    pub fn interactive_stdin() -> Self {
+        Self::new(LineRead(io::BufReader::new(std::io::stdin())))
     }
 }
 
