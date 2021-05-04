@@ -33,7 +33,6 @@
 //! ```
 //!
 //! `from source, ` を省くと標準入力から読みこむ
-//! デバッグビルドでは改行ごとに、リリースビルドでは EOF ごとに読む
 
 use std::{
     cell::RefCell,
@@ -42,14 +41,8 @@ use std::{
 };
 
 thread_local!(
-    #[cfg(not(debug_assertions))]
     #[doc(hidden)]
     pub static STDIN_SOURCE: RefCell<Source<Stdin>> = RefCell::new(Source::new(std::io::stdin()));
-
-    #[cfg(debug_assertions)]
-    #[doc(hidden)]
-    pub static STDIN_SOURCE: RefCell<Source<LineRead<io::BufReader<Stdin>>>> =
-        RefCell::new(Source::interactive_stdin());
 );
 
 /// 入力がない場合は panic
@@ -60,6 +53,7 @@ macro_rules! read {
     };
 }
 
+/// 入力がない場合は `None`
 #[macro_export]
 macro_rules! try_read {
     (from $source:expr, [$type:tt; $len:expr]) => {
@@ -119,28 +113,30 @@ pub struct Source<R: Read> {
     source: R,
 }
 impl<R: Read> Source<R> {
-    /// ふつう `BufReader` などを渡す必要はない。
+    /// ふつう [`BufReader`] などを渡す必要はない。
+    ///
+    /// [`BufReader`]: https://doc.rust-lang.org/nightly/std/io/struct.BufReader.html
     pub fn new(source: R) -> Self {
         Self {
             tokens: "".split_whitespace(),
             source,
         }
     }
-    /// バッファが空なら一度 `load` して再度試す
+    /// バッファが空なら一度 [`load`](#method.load) して再度試す
     pub fn next_token(&mut self) -> Option<&str> {
         self.tokens.next().or_else(|| {
             self.load();
             self.tokens.next()
         })
     }
-    /// まだ `next_token` 等で読み出していない入力は破棄される
+    /// まだ [`next_token`](#method.next_token) 等で読み出していない入力は破棄される
     pub fn load(&mut self) {
         let mut input = String::new();
         self.source.read_to_string(&mut input).unwrap();
         self.tokens = Box::leak(input.into_boxed_str()).split_whitespace();
     }
     /// バッファが空でなければ panic
-    /// `load` して試すことはない
+    /// [`load`](#method.load) して試すことはない
     pub fn finish(&mut self) {
         if self.tokens.next().is_some() {
             panic!("not finished")
@@ -148,15 +144,26 @@ impl<R: Read> Source<R> {
     }
 }
 
+/// [`Source::new_interactive`] で使う
+///
+/// [`Source::new_interactive`]: struct.Source.html#method.new_interactive
 pub struct LineRead<R>(pub R);
 impl<R: io::BufRead> Read for LineRead<R> {
     fn read_to_string(&mut self, buf: &mut String) -> io::Result<usize> {
         self.0.read_line(buf)
     }
 }
-impl Source<LineRead<io::BufReader<Stdin>>> {
-    pub fn interactive_stdin() -> Self {
-        Self::new(LineRead(io::BufReader::new(std::io::stdin())))
+impl<R: io::BufRead> Source<LineRead<R>> {
+    /// 改行ごとに読む `Source`
+    /// ```no_run
+    /// use input::{input, Source};
+    ///
+    /// let stdin = std::io::stdin();
+    /// let mut stdin = Source::new_interactive(stdin.lock());
+    /// input!(from stdin, n: usize);
+    /// ```
+    pub fn new_interactive(source: R) -> Self {
+        Self::new(LineRead(source))
     }
 }
 
