@@ -5,13 +5,13 @@ pub trait Permutatable {
     /// 更新したら `true`、もう最初の順列なら `false`
     fn prev_permutation(&mut self) -> bool;
     /// 自らを含み、辞書順でそれ以降の順列を全列挙する
+    fn permutations_after(&self) -> Permutations<Self::Item>;
+    /// 昇順ソートしてから `permutations_after`
     fn permutations(&self) -> Permutations<Self::Item>;
-    /// 昇順ソートしてから `permutations`
-    fn all_permutations(&self) -> Permutations<Self::Item>;
     /// 自らを含み、辞書順でそれ以前の順列を全列挙する
+    fn permutations_before(&self) -> PermutationsRev<Self::Item>;
+    /// 降順ソートしてから `permutations_before`
     fn permutations_rev(&self) -> PermutationsRev<Self::Item>;
-    /// 降順ソートしてから `permutations_rev`
-    fn all_permutations_rev(&self) -> PermutationsRev<Self::Item>;
 }
 
 impl<T: Ord + Clone> Permutatable for [T] {
@@ -38,24 +38,24 @@ impl<T: Ord + Clone> Permutatable for [T] {
         self.swap(i, j);
         true
     }
-    fn permutations(&self) -> Permutations<Self::Item> {
+    fn permutations_after(&self) -> Permutations<Self::Item> {
         Permutations {
             seq: self.to_vec(),
             first: true,
         }
     }
-    fn all_permutations(&self) -> Permutations<Self::Item> {
+    fn permutations(&self) -> Permutations<Self::Item> {
         let mut seq = self.to_vec();
         seq.sort();
         Permutations { seq, first: true }
     }
-    fn permutations_rev(&self) -> PermutationsRev<Self::Item> {
+    fn permutations_before(&self) -> PermutationsRev<Self::Item> {
         PermutationsRev {
             seq: self.to_vec(),
             first: true,
         }
     }
-    fn all_permutations_rev(&self) -> PermutationsRev<Self::Item> {
+    fn permutations_rev(&self) -> PermutationsRev<Self::Item> {
         let mut seq = self.to_vec();
         seq.sort_by(|a, b| b.cmp(a));
         PermutationsRev { seq, first: true }
