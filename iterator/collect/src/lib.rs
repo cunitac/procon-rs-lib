@@ -1,6 +1,6 @@
 use std::{
-    collections::{BTreeSet, HashSet, VecDeque},
-    hash::{BuildHasher, Hash},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque},
+    hash::Hash,
 };
 
 impl<I: Iterator> IterExt for I {}
@@ -25,10 +25,23 @@ pub trait IterExt: Iterator + Sized {
     {
         self.collect()
     }
-    fn to_hash_set<S>(self) -> HashSet<Self::Item>
+    fn to_hash_set(self) -> HashSet<Self::Item>
     where
         Self::Item: Eq + Hash,
-        S: BuildHasher + Default,
+    {
+        self.collect()
+    }
+    fn to_btree_map<K, V>(self) -> BTreeMap<K, V>
+    where
+        Self: Iterator<Item = (K, V)>,
+        K: Ord,
+    {
+        self.collect()
+    }
+    fn to_hash_map<K, V>(self) -> HashMap<K, V>
+    where
+        Self: Iterator<Item = (K, V)>,
+        K: Eq + Hash,
     {
         self.collect()
     }
