@@ -54,6 +54,14 @@ macro_rules! input {
     };
 }
 
+pub fn stdin_load() {
+    STDIN_SOURCE.with(|stdin| stdin.borrow_mut().load())
+}
+
+pub fn stdin_finish() {
+    STDIN_SOURCE.with(|stdin| stdin.borrow_mut().finish())
+}
+
 pub struct Source<R> {
     tokens: SplitWhitespace<'static>,
     source: R,
