@@ -1,15 +1,58 @@
+//! ```
+//! use input::{input, read, try_read, marker::*, Source};
+//!
+//! let source = "
+//!     42
+//!     4.2 四二
+//!     3  1 2 3
+//!     b bytes chars 1 -5
+//!     3  3 2 1
+//!     try
+//! ";
+//! let mut source = Source::new(source.as_bytes());
+//!
+//! assert_eq!(read!(from source, usize), 42);
+//! assert_eq!(read!(from source, f64, String), (4.2, String::from("四二")));
+//! assert_eq!(read!(from source, [u32]), vec![1, 2, 3]);
+//!
+//! input!(
+//!     from source,
+//!     (byte, (bytes, (chars, usize1,)), isize1): (Byte, (Bytes, (Chars, Usize1),), Isize1),
+//!     n: usize,
+//!     a: [i32; n],
+//! );
+//! assert_eq!(byte, b'b');
+//! assert_eq!(bytes, b"bytes");
+//! assert_eq!(chars, vec!['c', 'h', 'a', 'r', 's']);
+//! assert_eq!(usize1, 0);
+//! assert_eq!(isize1, -6);
+//! assert_eq!(a, vec![3, 2, 1]);
+//!
+//! assert_eq!(try_read!(from source, String), Some(String::from("try")));
+//! assert_eq!(try_read!(from source, String), None);
+//! ```
+//!
+//! `from source, ` を省くと標準入力から読みこむ
+//! デバッグビルドでは改行ごとに、リリースビルドでは EOF ごとに読む
+
 use std::{
     cell::RefCell,
-    io::{BufRead, BufReader, Stdin},
+    io::{self, Stdin},
     str::{FromStr, SplitWhitespace},
 };
 
 thread_local!(
+    #[cfg(not(debug_assertions))]
     #[doc(hidden)]
-    pub static STDIN_SOURCE: RefCell<Source<BufReader<Stdin>>> =
-        RefCell::new(Source::new(BufReader::new(std::io::stdin())));
+    pub static STDIN_SOURCE: RefCell<Source<Stdin>> = RefCell::new(Source::new(std::io::stdin()));
+
+    #[cfg(debug_assertions)]
+    #[doc(hidden)]
+    pub static STDIN_SOURCE: RefCell<Source<LineRead<io::BufReader<Stdin>>>> =
+        RefCell::new(Source::new(LineRead(io::BufReader::new(std::io::stdin()))));
 );
 
+/// 入力がない場合は panic
 #[macro_export]
 macro_rules! read {
     ($($arg:tt)*) => {
@@ -58,17 +101,41 @@ macro_rules! input {
 pub fn stdin_load() {
     STDIN_SOURCE.with(|stdin| stdin.borrow_mut().load())
 }
-
 pub fn stdin_finish() {
     STDIN_SOURCE.with(|stdin| stdin.borrow_mut().finish())
 }
 
-pub struct Source<R> {
+pub trait Read {
+    fn read_to_string(&mut self, buf: &mut String) -> io::Result<usize>;
+}
+impl<R: io::Read> Read for R {
+    fn read_to_string(&mut self, buf: &mut String) -> io::Result<usize> {
+        io::Read::read_to_string(self, buf)
+    }
+}
+
+/// おもにインタラクティブのために
+/// ```no_run
+/// use input::{input, LineRead, Source};
+///
+/// let stdin = std::io::stdin();
+/// let mut source = Source::new(LineRead(stdin.lock()));
+///
+/// input!(from source, a: u32);
+/// ```
+pub struct LineRead<R>(pub R);
+impl<R: io::BufRead> Read for LineRead<R> {
+    fn read_to_string(&mut self, buf: &mut String) -> io::Result<usize> {
+        self.0.read_line(buf)
+    }
+}
+
+pub struct Source<R: Read> {
     tokens: SplitWhitespace<'static>,
     source: R,
 }
-
-impl<R: BufRead> Source<R> {
+impl<R: Read> Source<R> {
+    /// ふつう `BufReader` などを渡す必要はない。
     pub fn new(source: R) -> Self {
         Self {
             tokens: "".split_whitespace(),
@@ -85,7 +152,7 @@ impl<R: BufRead> Source<R> {
     /// まだ `next_token` 等で読み出していない入力は破棄される
     pub fn load(&mut self) {
         let mut input = String::new();
-        self.source.read_line(&mut input).unwrap();
+        self.source.read_to_string(&mut input).unwrap();
         self.tokens = Box::leak(input.into_boxed_str()).split_whitespace();
     }
     /// バッファが空でなければ panic
@@ -100,28 +167,25 @@ impl<R: BufRead> Source<R> {
 pub trait FromSource {
     type Output;
     /// 読んでいる途中に `next_token` が `None` になった場合に限って `None` を返す
-    fn from_source<R: BufRead>(source: &mut Source<R>) -> Option<Self::Output>;
+    fn from_source<R: Read>(source: &mut Source<R>) -> Option<Self::Output>;
 }
 
 impl<T: FromStr> FromSource for T {
     type Output = T;
-    fn from_source<R: BufRead>(source: &mut Source<R>) -> Option<T> {
+    fn from_source<R: Read>(source: &mut Source<R>) -> Option<T> {
         Some(source.next_token()?.parse().ok().expect("failed to parse"))
     }
 }
 
 pub mod marker {
-    use {
-        super::{FromSource, Source},
-        std::io::BufRead,
-    };
+    use super::{FromSource, Read, Source};
     macro_rules! marker {
         ($name:ident, $output:ty, |$source:ident| $read:expr) => {
             pub enum $name {}
             impl FromSource for $name {
                 type Output = $output;
                 #[allow(unused_mut)]
-                fn from_source<R: BufRead>(mut $source: &mut Source<R>) -> Option<$output> {
+                fn from_source<R: Read>(mut $source: &mut Source<R>) -> Option<$output> {
                     Some($read)
                 }
             }
