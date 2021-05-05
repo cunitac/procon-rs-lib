@@ -14,10 +14,42 @@ impl HeavyLightDecomposition {
     pub fn new(adj: Vec<Vec<usize>>, root: usize) -> Self {
         let mut nodes = vec![Node::default(); adj.len()];
         nodes.iter_mut().zip(adj).for_each(|(n, a)| n.adj = a);
-        let mut ret = Self { nodes };
-        ret.dfs1(root, 0);
-        ret.dfs2(root, &mut 0);
-        ret
+
+        // - `adj` の先頭を Heavy Edge にする
+        // - `depth` と `parent` を設定する
+        // - `parent` へ向かう辺を削除する
+        fn dfs1(v: usize, depth: usize, nodes: &mut Vec<Node>) {
+            nodes[v].depth = depth;
+            nodes[v].subtree_size = 1;
+            if let Some(p) = nodes[v].parent {
+                let pi = nodes[v].adj.iter().position(|&u| u == p).unwrap();
+                nodes[v].adj.swap_remove(pi);
+            }
+            for i in 0..nodes[v].adj.len() {
+                let u = nodes[v].adj[i];
+                nodes[u].parent = Some(v);
+                dfs1(u, depth + 1, nodes);
+                nodes[v].subtree_size += nodes[u].subtree_size;
+                if nodes[u].subtree_size > nodes[nodes[v].adj[0]].subtree_size {
+                    nodes[v].adj.swap(0, i);
+                }
+            }
+        }
+        // `ord` と `leader` を設定する
+        fn dfs2(v: usize, ord: &mut usize, nodes: &mut Vec<Node>) {
+            nodes[v].ord = *ord;
+            *ord += 1;
+            for i in 0..nodes[v].adj.len() {
+                let u = nodes[v].adj[i];
+                nodes[u].parent = Some(v);
+                nodes[u].leader = if i == 0 { nodes[v].leader } else { u };
+                dfs2(u, ord, nodes);
+            }
+        }
+
+        dfs1(root, 0, &mut nodes);
+        dfs2(root, &mut 0, &mut nodes);
+        Self { nodes }
     }
     pub fn depth(&self, v: usize) -> usize {
         self.nodes[v].depth
@@ -34,7 +66,8 @@ impl HeavyLightDecomposition {
     pub fn subtree_size(&self, v: usize) -> usize {
         self.nodes[v].subtree_size
     }
-    pub fn subtree_range(&self, v: usize) -> std::ops::Range<usize> {
+    /// { `self.ord(u)` | `u` ∈ `v` の部分木 } に等しい `Range`
+    pub fn subtree_ord_range(&self, v: usize) -> std::ops::Range<usize> {
         self.ord(v)..self.ord(v) + self.subtree_size(v)
     }
     pub fn leader(&self, v: usize) -> usize {
@@ -54,36 +87,6 @@ impl HeavyLightDecomposition {
             a
         } else {
             b
-        }
-    }
-    /// - `adj` の先頭を Heavy Edge にする
-    /// - `depth` と `parent` を設定する
-    /// - `parent` へ向かう辺を削除する
-    fn dfs1(&mut self, v: usize, depth: usize) {
-        self.nodes[v].depth = depth;
-        self.nodes[v].subtree_size = 1;
-        if let Some(pi) = self.adj(v).iter().position(|&u| self.parent(v) == Some(u)) {
-            self.nodes[v].adj.swap_remove(pi);
-        }
-        for i in 0..self.adj(v).len() {
-            let u = self.adj(v)[i];
-            self.nodes[u].parent = Some(v);
-            self.dfs1(u, depth + 1);
-            self.nodes[v].subtree_size += self.subtree_size(u);
-            if self.subtree_size(u) > self.subtree_size(self.adj(v)[0]) {
-                self.nodes[v].adj.swap(0, i);
-            }
-        }
-    }
-    /// `ord` と `leader` を設定する
-    fn dfs2(&mut self, v: usize, ord: &mut usize) {
-        self.nodes[v].ord = *ord;
-        *ord += 1;
-        for i in 0..self.adj(v).len() {
-            let u = self.adj(v)[i];
-            self.nodes[u].parent = Some(v);
-            self.nodes[u].leader = if i == 0 { self.leader(v) } else { u };
-            self.dfs2(u, ord);
         }
     }
 }
