@@ -177,11 +177,13 @@ impl<T: FromStr> FromSource for T {
     type Output = T;
     fn from_source<R: Read>(source: &mut Source<R>) -> Option<T> {
         let next_token = source.next_token()?;
-        Some(
-            next_token
-                .parse()
-                .unwrap_or_else(|_| panic!("failed to parse {}", next_token)),
-        )
+        Some(next_token.parse().unwrap_or_else(|_| {
+            panic!(
+                "failed to parse {} as {}",
+                next_token,
+                std::any::type_name::<T>()
+            )
+        }))
     }
 }
 
