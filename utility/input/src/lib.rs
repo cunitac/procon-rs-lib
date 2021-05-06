@@ -199,6 +199,11 @@ pub mod marker {
     marker!(Chars, Vec<char>, |s| s.next_token()?.chars().collect());
     marker!(Usize1, usize, |s| try_read!(from s, usize)? - 1);
     marker!(Isize1, isize, |s| try_read!(from s, isize)? - 1);
+    marker!(Bool01, bool, |s| match &try_read!(from s, String)?[..] {
+        "1" => true,
+        "0" => false,
+        s => panic!("failed to parse {} as bool", s),
+    });
 }
 
 #[cfg(test)]
