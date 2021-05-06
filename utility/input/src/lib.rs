@@ -176,7 +176,12 @@ pub trait FromSource {
 impl<T: FromStr> FromSource for T {
     type Output = T;
     fn from_source<R: Read>(source: &mut Source<R>) -> Option<T> {
-        Some(source.next_token()?.parse().ok().expect("failed to parse"))
+        let next_token = source.next_token()?;
+        Some(
+            next_token
+                .parse()
+                .unwrap_or_else(|_| panic!("failed to parse {}", next_token)),
+        )
     }
 }
 
