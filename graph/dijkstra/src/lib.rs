@@ -1,14 +1,17 @@
-use std::{
-    cmp::Ordering,
-    collections::{BinaryHeap, HashMap},
-    hash::Hash,
-    ops::Add,
+use {
+    anyway_ord::AnywayOrd,
+    std::{
+        cmp::Ordering,
+        collections::{BinaryHeap, HashMap},
+        hash::Hash,
+        ops::Add,
+    },
 };
 
 pub fn dijkstra<N, C, A, I>(start: N, goal: Option<N>, mut adj: A) -> HashMap<N, C>
 where
     N: Eq + Hash + Clone,
-    C: Zero + Ord + Add<C, Output = C> + Clone,
+    C: Zero + Ord + Add<Output = C> + Clone,
     A: FnMut(N) -> I,
     I: IntoIterator<Item = (N, C)>,
 {
@@ -47,6 +50,67 @@ where
     dist
 }
 
+pub fn dijkstra_usize<C, A, I>(
+    start: usize,
+    goal: Option<usize>,
+    n: usize,
+    adj: A,
+) -> Vec<Option<C>>
+where
+    C: Ord + Zero + Clone + Add<Output = C>,
+    A: FnMut(usize) -> I,
+    I: IntoIterator<Item = (usize, C)>,
+{
+    dijkstra_vec(start, goal, n, Clone::clone, adj)
+}
+
+pub fn dijkstra_vec<N, C, A, I, Id>(
+    start: N,
+    goal: Option<N>,
+    n: usize,
+    id: Id,
+    mut adj: A,
+) -> Vec<Option<C>>
+where
+    Id: Fn(&N) -> usize,
+    C: Ord + Zero + Clone + Add<Output = C>,
+    N: PartialEq,
+    A: FnMut(N) -> I,
+    I: IntoIterator<Item = (N, C)>,
+{
+    let mut dist = vec![None; n];
+    let mut heap = BinaryHeap::new();
+
+    dist[id(&start)] = Some(C::zero());
+    heap.push(KeyValue(C::zero(), start));
+
+    while let Some(KeyValue(dist_v, v)) = heap.pop() {
+        if dist[id(&v)].as_ref().unwrap() != &dist_v {
+            continue;
+        }
+        if goal.as_ref().map_or(false, |goal| &v == goal) {
+            break;
+        }
+        for (u, c) in adj(v) {
+            let dist_u_new = dist_v.clone() + c;
+            match dist[id(&u)].as_mut() {
+                Some(dist_u) => {
+                    if *dist_u > dist_u_new {
+                        *dist_u = dist_u_new;
+                        heap.push(KeyValue(dist_u.clone(), u));
+                    }
+                }
+                None => {
+                    dist[id(&u)] = Some(dist_u_new.clone());
+                    heap.push(KeyValue(dist_u_new, u));
+                }
+            }
+        }
+    }
+
+    dist
+}
+
 pub trait Zero {
     fn zero() -> Self;
 }
@@ -62,6 +126,12 @@ macro_rules! zero {
     };
 }
 zero!(u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize);
+
+impl<T: Zero + Ord> Zero for AnywayOrd<T> {
+    fn zero() -> Self {
+        AnywayOrd(T::zero())
+    }
+}
 
 struct KeyValue<K, V>(K, V);
 impl<K: PartialEq, V> PartialEq for KeyValue<K, V> {
