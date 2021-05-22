@@ -32,8 +32,12 @@
 //! assert_eq!(try_read!(from source, String), None);
 //! ```
 //!
-//! `from source, ` を省くと標準入力から読みこむ
+//! `from source, ` を省くと標準入力から読みこむ。インタラクティブ問題で使用する場合は、feature として interactive を指定するか、
+//! [`Source::new_interactive`](struct.Source.html#method.new_interactive)を参照する。後者で `StdinLock` を用いたほうが、
+//! （たぶん）高速である。
 
+#[cfg(feature = "interactive")]
+use std::io::BufReader;
 use std::{
     cell::RefCell,
     io::{self, Stdin},
@@ -42,7 +46,12 @@ use std::{
 
 thread_local!(
     #[doc(hidden)]
+    #[cfg(not(feature = "interactive"))]
     pub static STDIN_SOURCE: RefCell<Source<Stdin>> = RefCell::new(Source::new(std::io::stdin()));
+    #[doc(hidden)]
+    #[cfg(feature = "interactive")]
+    pub static STDIN_SOURCE: RefCell<Source<LineRead<BufReader<Stdin>>>> =
+        RefCell::new(Source::new(LineRead(BufReader::new(std::io::stdin()))));
 );
 
 /// 入力がない場合は panic
