@@ -44,12 +44,14 @@ use std::{
     str::{FromStr, SplitWhitespace},
 };
 
+#[doc(hidden)]
+#[cfg(not(feature = "interactive"))]
 thread_local!(
-    #[doc(hidden)]
-    #[cfg(not(feature = "interactive"))]
     pub static STDIN_SOURCE: RefCell<Source<Stdin>> = RefCell::new(Source::new(std::io::stdin()));
-    #[doc(hidden)]
-    #[cfg(feature = "interactive")]
+);
+#[doc(hidden)]
+#[cfg(feature = "interactive")]
+thread_local!(
     pub static STDIN_SOURCE: RefCell<Source<LineRead<BufReader<Stdin>>>> =
         RefCell::new(Source::new(LineRead(BufReader::new(std::io::stdin()))));
 );
