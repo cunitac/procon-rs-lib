@@ -1,5 +1,5 @@
 [package]
-name = "mininput"
+name = "a"
 version = "0.1.0"
 edition = "2018"
 authors = ["cunitac <cunitac@gmail.com>"]
@@ -8,3 +8,5 @@ license = "MIT"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+input = { git = "https://github.com/cunitac/procon-rs-lib" }
+mininput = { git = "https://github.com/cunitac/procon-rs-lib" }
