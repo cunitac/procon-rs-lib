@@ -105,6 +105,16 @@ macro_rules! input {
     };
     (from $source:expr, $(,)?) => {
     };
+    (mut $name0:tt: $type0: tt, $($rest:tt)*) => {
+        let mut $name0 = $crate::read!($type0);
+        $crate::input!($($rest)*);
+    };
+    ($name0:tt: $type0: tt, $($rest:tt)*) => {
+        let $name0 = $crate::read!($type0);
+        $crate::input!($($rest)*);
+    };
+    ($(,)?) => {
+    };
 }
 
 pub fn stdin_load() {
