@@ -95,11 +95,15 @@ macro_rules! try_read {
 
 #[macro_export]
 macro_rules! input {
-    (from $source:expr, $($name:tt: $type:tt),* $(,)?) => {
-        $(let $name = $crate::read!(from $source, $type);)*
+    (from $source:expr, mut $name0:tt: $type0: tt, $($rest:tt)*) => {
+        let mut $name0 = $crate::read!(from $source, $type0);
+        $crate::input!(from $source, $($rest)*);
     };
-    ($($name:tt: $type:tt),* $(,)?) => {
-        $(let $name = $crate::read!($type);)*
+    (from $source:expr, $name0:tt: $type0: tt, $($rest:tt)*) => {
+        let $name0 = $crate::read!(from $source, $type0);
+        $crate::input!(from $source, $($rest)*);
+    };
+    (from $source:expr, $(,)?) => {
     };
 }
 
@@ -249,7 +253,7 @@ mod tests {
             from source,
             (byte, (bytes, (chars, usize1,)), isize1): (Byte, (Bytes, (Chars, Usize1),), Isize1),
             n: usize,
-            a: [i32; n],
+            mut a: [i32; n],
         );
         assert_eq!(byte, b'b');
         assert_eq!(bytes, b"bytes");
@@ -257,6 +261,8 @@ mod tests {
         assert_eq!(usize1, 0);
         assert_eq!(isize1, -6);
         assert_eq!(a, vec![3, 2, 1]);
+        a.sort_unstable();
+        assert_eq!(a, vec![1, 2, 3]);
 
         assert_eq!(try_read!(from source, String), Some(String::from("try")));
         assert_eq!(try_read!(from source, String), None);
