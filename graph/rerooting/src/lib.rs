@@ -1,3 +1,8 @@
+/// 辺集合 edge として木があるとき、(i, j) or (j, i) in edge について
+/// dp[i][j]: T = h( f{ g(dp[j][k], k) | k in c[i][j]) },  i)
+/// c[i][j] = i を根とした j の子
+/// (T, f, id) は可換モノイド
+/// ret[i] = dp[i][i] なる ret を返す
 pub fn rerooting_dp<T, F, G, H>(edge: &[(usize, usize)], id: T, f: F, g: G, h: H) -> Vec<T>
 where
     T: Clone + Default,
