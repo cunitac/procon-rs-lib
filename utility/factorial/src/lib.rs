@@ -15,8 +15,8 @@ impl<M: ModIntBase> Factorial<M> {
         }
         let mut inv = vec![M::raw(1); n];
         inv[n - 1] = val[n - 1].inv();
-        for i in (2..n).rev() {
-            inv[i] = inv[i + 1] * M::raw((i + 1) as u32);
+        for i in (3..n).rev() {
+            inv[i - 1] = inv[i] * M::raw(i as u32);
         }
         Self { val, inv }
     }
