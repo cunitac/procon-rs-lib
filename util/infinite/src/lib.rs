@@ -3,19 +3,19 @@ use {
         fmt,
         ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
     },
-    MaybeInf::*,
+    Extended::*,
 };
 
 /// 良い感じに加減乗算や比較ができる。
 /// 良い感じにできないときは panic する。
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum MaybeInf<T> {
+pub enum Extended<T> {
     NegInf,
     Finite(T),
     PosInf,
 }
 
-impl<T> MaybeInf<T> {
+impl<T> Extended<T> {
     /// `Finite` でなければ panic
     pub fn unwrap(self) -> T {
         match self {
@@ -25,7 +25,7 @@ impl<T> MaybeInf<T> {
     }
 }
 
-impl<T: fmt::Debug> fmt::Debug for MaybeInf<T> {
+impl<T: fmt::Debug> fmt::Debug for Extended<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Finite(v) => v.fmt(f),
@@ -35,9 +35,9 @@ impl<T: fmt::Debug> fmt::Debug for MaybeInf<T> {
     }
 }
 
-impl<T> From<MaybeInf<T>> for Option<T> {
+impl<T> From<Extended<T>> for Option<T> {
     /// `Finite` のときに `Some`
-    fn from(v: MaybeInf<T>) -> Option<T> {
+    fn from(v: Extended<T>) -> Option<T> {
         match v {
             Finite(v) => Some(v),
             _ => None,
@@ -45,14 +45,14 @@ impl<T> From<MaybeInf<T>> for Option<T> {
     }
 }
 
-impl<T> From<T> for MaybeInf<T> {
+impl<T> From<T> for Extended<T> {
     fn from(v: T) -> Self {
         Finite(v)
     }
 }
 
-impl<T: Neg> Neg for MaybeInf<T> {
-    type Output = MaybeInf<T::Output>;
+impl<T: Neg> Neg for Extended<T> {
+    type Output = Extended<T::Output>;
     fn neg(self) -> Self::Output {
         match self {
             Finite(a) => Finite(-a),
@@ -62,12 +62,12 @@ impl<T: Neg> Neg for MaybeInf<T> {
     }
 }
 
-impl<T: Add<U>, U> Add<MaybeInf<U>> for MaybeInf<T> {
-    type Output = MaybeInf<T::Output>;
+impl<T: Add<U>, U> Add<Extended<U>> for Extended<T> {
+    type Output = Extended<T::Output>;
     /// # Panics
     /// - `PosInf + NegInf`
     /// - `NegInf + PosInf`
-    fn add(self, rhs: MaybeInf<U>) -> Self::Output {
+    fn add(self, rhs: Extended<U>) -> Self::Output {
         match (self, rhs) {
             (Finite(a), Finite(b)) => Finite(a + b),
             (PosInf, NegInf) => panic!("PosInf + NegInf"),
@@ -78,11 +78,11 @@ impl<T: Add<U>, U> Add<MaybeInf<U>> for MaybeInf<T> {
     }
 }
 
-impl<T: AddAssign<U>, U> AddAssign<MaybeInf<U>> for MaybeInf<T> {
+impl<T: AddAssign<U>, U> AddAssign<Extended<U>> for Extended<T> {
     /// # Panics
     /// - `PosInf += NegInf`
     /// - `NegInf += PosInf`
-    fn add_assign(&mut self, rhs: MaybeInf<U>) {
+    fn add_assign(&mut self, rhs: Extended<U>) {
         if let Finite(a) = self {
             if let Finite(b) = rhs {
                 return *a += b;
@@ -96,12 +96,12 @@ impl<T: AddAssign<U>, U> AddAssign<MaybeInf<U>> for MaybeInf<T> {
     }
 }
 
-impl<T: Sub<U>, U> Sub<MaybeInf<U>> for MaybeInf<T> {
-    type Output = MaybeInf<T::Output>;
+impl<T: Sub<U>, U> Sub<Extended<U>> for Extended<T> {
+    type Output = Extended<T::Output>;
     /// # Panics
     /// - `PosInf - PosInf`
     /// - `NegInf - NegInf`
-    fn sub(self, rhs: MaybeInf<U>) -> Self::Output {
+    fn sub(self, rhs: Extended<U>) -> Self::Output {
         match (self, rhs) {
             (Finite(a), Finite(b)) => Finite(a - b),
             (PosInf, PosInf) => panic!("PosInf - PosInf"),
@@ -112,11 +112,11 @@ impl<T: Sub<U>, U> Sub<MaybeInf<U>> for MaybeInf<T> {
     }
 }
 
-impl<T: SubAssign<U>, U> SubAssign<MaybeInf<U>> for MaybeInf<T> {
+impl<T: SubAssign<U>, U> SubAssign<Extended<U>> for Extended<T> {
     /// # Panics
     /// - `PosInf -= PosInf`
     /// - `NegInf -= NegInf`
-    fn sub_assign(&mut self, rhs: MaybeInf<U>) {
+    fn sub_assign(&mut self, rhs: Extended<U>) {
         if let Finite(a) = self {
             if let Finite(b) = rhs {
                 return *a -= b;
@@ -130,14 +130,14 @@ impl<T: SubAssign<U>, U> SubAssign<MaybeInf<U>> for MaybeInf<T> {
     }
 }
 
-impl<T: Mul<U> + Signed, U: Signed> Mul<MaybeInf<U>> for MaybeInf<T> {
-    type Output = MaybeInf<T::Output>;
+impl<T: Mul<U> + Signed, U: Signed> Mul<Extended<U>> for Extended<T> {
+    type Output = Extended<T::Output>;
     /// # Panics
     /// - `Zero * PosInf`
     /// - `Zero * NegInf`
     /// - `PosInf * Zero`
     /// - `NegInf * Zero`
-    fn mul(self, rhs: MaybeInf<U>) -> Self::Output {
+    fn mul(self, rhs: Extended<U>) -> Self::Output {
         use Signum::*;
         match (self, rhs) {
             (Finite(a), Finite(b)) => Finite(a * b),
@@ -165,13 +165,13 @@ impl<T: Mul<U> + Signed, U: Signed> Mul<MaybeInf<U>> for MaybeInf<T> {
     }
 }
 
-impl<T: MulAssign<U> + Signed, U: Signed> MulAssign<MaybeInf<U>> for MaybeInf<T> {
+impl<T: MulAssign<U> + Signed, U: Signed> MulAssign<Extended<U>> for Extended<T> {
     /// # Panics
     /// - `Zero *= PosInf`
     /// - `Zero *= NegInf`
     /// - `PosInf *= Zero`
     /// - `NegInf *= Zero`
-    fn mul_assign(&mut self, rhs: MaybeInf<U>) {
+    fn mul_assign(&mut self, rhs: Extended<U>) {
         use Signum::*;
         match self {
             Finite(a) => match rhs {
@@ -226,7 +226,7 @@ macro_rules! impl_singed {
     )*};
 }
 impl_singed!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize, f32, f64);
-impl<T: Signed> Signed for MaybeInf<T> {
+impl<T: Signed> Signed for Extended<T> {
     fn signum(&self) -> Signum {
         match self {
             Finite(a) => a.signum(),
@@ -252,7 +252,7 @@ impl_zero!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize, f32, 
 
 #[cfg(test)]
 mod tests {
-    use super::MaybeInf::*;
+    use super::Extended::*;
     #[test]
     fn test_unwrap() {
         assert_eq!(Finite(1).unwrap(), 1);
